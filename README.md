@@ -15,6 +15,21 @@ owns only the terminal UI and the stdin/stdout plumbing — so you build your ow
 experience without re-implementing an agent, and you ride your **Max
 subscription** because we never set an API key.
 
+## Features
+
+- **Rides your Pro/Max subscription** — drives the real `claude` CLI as a subprocess and scrubs `ANTHROPIC_API_KEY` / `ANTHROPIC_AUTH_TOKEN` from its env, so it never silently falls back to API billing.
+- **Four permission modes** — `plan`, `ask`, `build` (auto-accept edits), `bypass`; cycle with `shift+tab` or `/mode`.
+- **Inline approvals** — in `ask` mode every gated tool call raises a `[ENTER] allow · [ESC] deny` bar (served by a hand-rolled in-process MCP permission server); edits show the diff before you decide.
+- **Visual diff cards** — `Edit` / `Write` / `MultiEdit` render as line-numbered red/green diffs instead of raw JSON.
+- **Markdown replies** — Claude's output is rendered with Glamour and reflows on resize.
+- **Session resume** — `ctrl+r` (or `/sessions`) fuzzy-filters `claude`'s own session history and re-execs into the one you pick.
+- **Command palette** — `ctrl+t` runs slash commands: `/model`, `/compact`, `/mouse`, `/cwd`, `/clear`, …
+- **11 themes + header animations** — `/theme` and `/settings`, with live preview, persisted across launches (see [Themes](#themes)).
+- **Live status bar** — permission mode, session id, git branch, a context-pressure gauge that auto-grows 200K → 2M, output tokens, and running cost.
+- **Info sidebar** — `ctrl+g` / `/sidebar` toggles an at-a-glance BBS info rail.
+- **Bring your own tools** — point `-mcp` at a `.mcp.json` to wire extra MCP tools alongside the built-in approvals server.
+- **Prompt history & queueing** — `↑` / `↓` recalls past prompts; type while Claude is busy and messages queue, draining one per turn.
+
 ## Why this architecture (vs forking Crush/OpenCode)
 
 Those are native API-client agents: to use Max they route a subscription OAuth
