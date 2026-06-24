@@ -1,74 +1,68 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="822" height="412" viewBox="0 0 822 412">
-<rect width="822" height="412" fill="#0a0a0a"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="851" height="443" viewBox="0 0 851 443">
+<rect width="851" height="443" fill="#0a0a0a"/>
 <text x="16.0" y="30.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
-<tspan x="16.0" fill="#ffffff" font-weight="400"></tspan>
 </text>
 <text x="16.0" y="49.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
-<tspan x="16.0" fill="#ffffff" font-weight="400"></tspan>
 </text>
-<text x="243.5" y="68.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
-<tspan x="243.5" fill="#ff55ff" font-weight="700">_|      _|          _|          _|  _|_|_|</tspan>
+<text x="16.0" y="68.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
+<tspan x="152.5" fill="#ffb000" font-weight="700">                888   888      .d8888b.      888 .d8888b.  </tspan>
 </text>
-<text x="52.4" y="87.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
-<tspan x="52.4" fill="#ff55ff" font-weight="700">_|_|_|    _|_|_|  _|_|_|_|  _|_|_|    _|  _|    _|_|_|        _|</tspan>
+<text x="16.0" y="87.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
+<tspan x="152.5" fill="#ffb000" font-weight="700">                888   888     d88P  Y88b     888d88P  Y88b </tspan>
 </text>
-<text x="25.1" y="106.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
-<tspan x="25.1" fill="#ff55ff" font-weight="700">_|        _|    _|    _|      _|    _|  _|  _|  _|    _|    _|_|</tspan>
+<text x="16.0" y="106.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
+<tspan x="152.5" fill="#ffb000" font-weight="700">                888   888     888    888     888     .d88P </tspan>
 </text>
 <text x="16.0" y="125.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
-<tspan x="16.0" fill="#ff55ff" font-weight="700">_|        _|    _|    _|      _|    _|  _|  _|  _|    _|        _|</tspan>
+<tspan x="152.5" fill="#ffb000" font-weight="700"> .d8888b 8888b. 88888888888b. 888    888 .d88888    8888"  </tspan>
 </text>
-<text x="25.1" y="144.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
-<tspan x="25.1" fill="#ff55ff" font-weight="700">_|_|_|    _|_|_|      _|_|  _|    _|    _|      _|_|_|  _|_|_|</tspan>
+<text x="16.0" y="144.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
+<tspan x="152.5" fill="#ffb000" font-weight="700">d88P"       "88b888   888 "88b888    888d88" 888     "Y8b. </tspan>
 </text>
 <text x="16.0" y="163.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
-<tspan x="16.0" fill="#ffffff" font-weight="400"></tspan>
+<tspan x="152.5" fill="#ffb000" font-weight="700">888     .d888888888   888  888888    888888  888888    888 </tspan>
 </text>
-<text x="279.9" y="182.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
-<tspan x="279.9" fill="#55ffff" font-weight="400">░▒▓█ </tspan>
-<tspan x="325.4" fill="#ffffff" font-weight="400">4 0N3-n0D3 b04Rd</tspan>
-<tspan x="471.0" fill="#55ffff" font-weight="400"> █▓▒░</tspan>
+<text x="16.0" y="182.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
+<tspan x="152.5" fill="#ffb000" font-weight="700">Y88b.   888  888Y88b. 888  888Y88b  d88PY88b 888Y88b  d88P </tspan>
 </text>
 <text x="16.0" y="201.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
-<tspan x="16.0" fill="#ffffff" font-weight="400"></tspan>
+<tspan x="152.5" fill="#ffb000" font-weight="700"> "Y8888P"Y888888 "Y888888  888 "Y8888P"  "Y88888 "Y8888P"  </tspan>
 </text>
-<text x="289.0" y="220.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
-<tspan x="289.0" fill="#8a8a8a" font-weight="400">ATDT 1-800-CLAUDE . . .</tspan>
+<text x="16.0" y="220.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
 </text>
-<text x="261.7" y="239.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
-<tspan x="261.7" fill="#55ff55" font-weight="400">CONNECT 57600/ARQ/V.42bis/LAPM</tspan>
+<text x="16.0" y="239.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
+<tspan x="307.2" fill="#ffffff" font-weight="400">░▒▓█ </tspan>
+<tspan x="352.7" fill="#ffffff" font-weight="400">4 0N3-n0D3 b04Rd</tspan>
+<tspan x="498.3" fill="#ffffff" font-weight="400"> █▓▒░</tspan>
 </text>
-<text x="325.4" y="258.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
-<tspan x="325.4" fill="#55ffff" font-weight="700">C4rR13r D373c73D</tspan>
+<text x="16.0" y="258.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
 </text>
 <text x="16.0" y="277.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
-<tspan x="16.0" fill="#ffffff" font-weight="400"></tspan>
+<tspan x="316.3" fill="#ffffff" font-weight="400">ATDT 1-800-CLAUDE . . .</tspan>
 </text>
 <text x="16.0" y="296.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
-<tspan x="16.0" fill="#55ffff" font-weight="400">··─────────────────────────────────┼</tspan>
-<tspan x="343.6" fill="#55ffff" font-weight="400">[ </tspan>
-<tspan x="361.8" fill="#ff55ff" font-weight="700">C47H0D3</tspan>
-<tspan x="425.5" fill="#55ffff" font-weight="400"> ]</tspan>
-<tspan x="443.7" fill="#55ffff" font-weight="400">┼──────────────────────────────────··</tspan>
+<tspan x="289.0" fill="#ffffff" font-weight="400">CONNECT 57600/ARQ/V.42bis/LAPM</tspan>
 </text>
 <text x="16.0" y="315.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
-<tspan x="16.0" fill="#ffffff" font-weight="400"></tspan>
+<tspan x="352.7" fill="#ffffff" font-weight="700">C4rR13r D373c73D</tspan>
 </text>
-<text x="198.0" y="334.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
-<tspan x="198.0" fill="#8a8a8a" font-weight="400">5Y50p: W1lL14m</tspan>
-<tspan x="325.4" fill="#55ffff" font-weight="400">   ▪   </tspan>
-<tspan x="389.1" fill="#8a8a8a" font-weight="400">357 2026</tspan>
-<tspan x="461.9" fill="#55ffff" font-weight="400">   ▪   </tspan>
-<tspan x="525.6" fill="#8a8a8a" font-weight="400">N0d3 1/1</tspan>
+<text x="16.0" y="334.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
 </text>
 <text x="16.0" y="353.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
-<tspan x="16.0" fill="#ffffff" font-weight="400"></tspan>
+<tspan x="16.0" fill="#ffffff" font-weight="400">··────────────────────────────────────┼</tspan>
+<tspan x="370.9" fill="#ffffff" font-weight="400">[ </tspan>
+<tspan x="389.1" fill="#ffb000" font-weight="700">cath0d3</tspan>
+<tspan x="452.8" fill="#ffffff" font-weight="400"> ]</tspan>
+<tspan x="471.0" fill="#ffffff" font-weight="400">┼─────────────────────────────────────··</tspan>
 </text>
-<rect x="261.7" y="358.0" width="273.0" height="19.0" fill="#ff55ff"/>
-<text x="261.7" y="372.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
-<tspan x="261.7" fill="#ffffff" font-weight="700"> Pr355 [3N73r] 70 L0g0N . . . </tspan>
+<text x="16.0" y="372.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
 </text>
 <text x="16.0" y="391.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
-<tspan x="16.0" fill="#ffffff" font-weight="400"></tspan>
+<tspan x="225.3" fill="#ffffff" font-weight="400">5Y50p: W1lL14m   ▪   357 2026   ▪   N0d3 1/1</tspan>
+</text>
+<text x="16.0" y="410.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
+</text>
+<text x="16.0" y="429.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
+<tspan x="289.0" fill="#ffffff" font-weight="700"> Pr355 [3N73r] 70 L0g0N . . . </tspan>
 </text>
 </svg>
