@@ -23,7 +23,10 @@ func TestGenerateAssets(t *testing.T) {
 		t.Skip("set CATHODE_GENASSETS=1 to regenerate assets/cathode-*.svg")
 	}
 	lipgloss.SetColorProfile(termenv.TrueColor)
-	applyTheme(defaultSettings().Theme)
+	// Render the marketing assets in Catppuccin Mocha rather than the default
+	// near-monochrome amber/cyan BBS phosphor palette, so the images show off the
+	// colored chrome (diff red/green, mauve approve bar, teal status bar).
+	applyTheme("catppuccin")
 
 	for _, a := range []struct {
 		path, screen string
@@ -31,7 +34,9 @@ func TestGenerateAssets(t *testing.T) {
 		{"assets/cathode-splash.svg", genSplashScreen()},
 		{"assets/cathode-preview.svg", genPreviewScreen()},
 	} {
-		if err := os.WriteFile(a.path, []byte(ansiToSVG(a.screen)), 0o644); err != nil {
+		// Canvas + default text from the active palette (Catppuccin base #1e1e2e
+		// and text #cdd6f4) so unstyled cells sit on-theme, not on BBS black/white.
+		if err := os.WriteFile(a.path, []byte(ansiToSVG(a.screen, string(colBlack), string(colWhite))), 0o644); err != nil {
 			t.Fatalf("write %s: %v", a.path, err)
 		}
 		t.Logf("wrote %s", a.path)
@@ -52,7 +57,9 @@ func genPreviewScreen() string {
 	sp.Spinner = bbsSpinner("scan")
 	m := model{
 		mode: "ask", session: "a1b2c3d4", modelID: "sonnet",
-		headerStyle: defaultSettings().Header,
+		// "theme" header shimmer ties the wordmark to the active palette (teal in
+		// Catppuccin) instead of the default hardcoded cyan, for a cohesive image.
+		headerStyle: headerTheme,
 		lastCost:    0.0042,
 		ctxTokens:   24000, outTokens: 1200, ctxLimit: 200000,
 		busy: true, follow: true, ready: true,

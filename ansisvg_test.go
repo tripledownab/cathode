@@ -29,7 +29,9 @@ type svgRun struct {
 	bold   bool
 }
 
-func ansiToSVG(screen string) string {
+// ansiToSVG renders screen onto a canvas of bg, with unstyled text drawn in
+// defaultFG (both hex, e.g. the active palette's base + text colors).
+func ansiToSVG(screen, bg, defaultFG string) string {
 	lines := strings.Split(strings.TrimRight(screen, "\n"), "\n")
 	maxCols := 0
 	for _, ln := range lines {
@@ -42,7 +44,7 @@ func ansiToSVG(screen string) string {
 
 	var b strings.Builder
 	fmt.Fprintf(&b, `<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d" viewBox="0 0 %d %d">`+"\n", width, height, width, height)
-	fmt.Fprintf(&b, `<rect width="%d" height="%d" fill="#0a0a0a"/>`+"\n", width, height)
+	fmt.Fprintf(&b, `<rect width="%d" height="%d" fill="%s"/>`+"\n", width, height, bg)
 	for li, ln := range lines {
 		y := svgY0 + svgLineH*float64(li)
 		runs := parseRuns(ln)
@@ -61,7 +63,7 @@ func ansiToSVG(screen string) string {
 			}
 			fg := r.fg
 			if fg == "" {
-				fg = "#ffffff"
+				fg = defaultFG
 			}
 			weight := 400
 			if r.bold {
