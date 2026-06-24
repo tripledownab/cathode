@@ -64,6 +64,11 @@ type model struct {
 	// follow pins the transcript to the latest line while Claude streams;
 	// cleared when the user scrolls up to read back (see scroll.go).
 	follow bool
+	// animating/spinning track whether a header / spinner tick is already in
+	// flight, so exactly one is armed and an idle screen (static header, not
+	// busy) stops redrawing instead of waking the runtime many times a second.
+	animating bool
+	spinning  bool
 
 	entries  []entry
 	queue    []string          // user messages typed while busy; drained one per turn end
@@ -157,7 +162,10 @@ func (m *model) observeCtx(tokens int) {
 }
 
 func (m model) Init() tea.Cmd {
-	cmds := []tea.Cmd{textinput.Blink, m.sp.Tick, splashTick(), rainbowTick(), requestModels(m.engine)}
+	// The spinner and header ticks are armed lazily (only while busy / while the
+	// header animates) so an idle screen stops redrawing — see armSpinnerIfNeeded
+	// and armHeaderIfNeeded in update.go.
+	cmds := []tea.Cmd{textinput.Blink, splashTick(), requestModels(m.engine)}
 	if m.approvals != nil {
 		cmds = append(cmds, waitApproval(m.approvals))
 	}

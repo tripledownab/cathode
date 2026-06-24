@@ -15,10 +15,14 @@ import (
 // animating even when Claude is idle.
 type rainbowTickMsg struct{}
 
-// rainbowTick schedules the next animation frame. ~12fps is smooth enough for a
-// drifting band without waking the runtime more than the spinner already does.
-func rainbowTick() tea.Cmd {
-	return tea.Tick(80*time.Millisecond, func(time.Time) tea.Msg { return rainbowTickMsg{} })
+// rainbowTick schedules the next animation frame at the configured fps. Lower
+// fps means fewer idle redraws (less CPU); the header style "off" stops the
+// loop entirely (the Update handler declines to re-arm it).
+func rainbowTick(fps int) tea.Cmd {
+	if fps <= 0 {
+		fps = defaultFPS
+	}
+	return tea.Tick(time.Second/time.Duration(fps), func(time.Time) tea.Msg { return rainbowTickMsg{} })
 }
 
 // Tuning knobs for the sweep. charStep is the phase gap between adjacent letters

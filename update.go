@@ -32,14 +32,26 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m = nm
 
 	case spinner.TickMsg:
-		var cmd tea.Cmd
-		m.sp, cmd = m.sp.Update(msg)
-		cmds = append(cmds, cmd)
+		// Only advance / re-arm while busy; idle, we let it lapse so the status
+		// spinner isn't repainting the whole screen for nothing.
+		if m.busy {
+			var cmd tea.Cmd
+			m.sp, cmd = m.sp.Update(msg)
+			cmds = append(cmds, cmd)
+		} else {
+			m.spinning = false
+		}
 
 	case rainbowTickMsg:
-		// Drift the header wordmark's color band; re-arm so it keeps cycling.
-		m.colorPhase++
-		cmds = append(cmds, rainbowTick())
+		// Drift the header band and re-arm at the configured fps — but only while
+		// it actually animates (style not "off", fps > 0, splash gone). Otherwise
+		// stop, so an idle screen quits redrawing.
+		if m.shouldAnimateHeader() {
+			m.colorPhase++
+			cmds = append(cmds, rainbowTick(m.settings.FPS))
+		} else {
+			m.animating = false
+		}
 
 	case splashTickMsg:
 		// Once the splash is dismissed (or fully revealed) we stop re-arming
@@ -87,7 +99,42 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.vp, cmd = m.vp.Update(msg)
 	cmds = append(cmds, cmd)
 	m.syncScroll(msg, prevInput)
+	// Arm the animation ticks if they should be running and aren't yet. Handlers
+	// that return early (handled keys) arm them directly, so this only has to
+	// catch the fall-through paths (stream events, resize, the ticks themselves).
+	if c := m.armHeaderIfNeeded(); c != nil {
+		cmds = append(cmds, c)
+	}
+	if c := m.armSpinnerIfNeeded(); c != nil {
+		cmds = append(cmds, c)
+	}
 	return m, tea.Batch(cmds...)
+}
+
+// shouldAnimateHeader reports whether the header wordmark's color tick should be
+// running: past the splash, an animated style, and a positive fps.
+func (m *model) shouldAnimateHeader() bool {
+	return !m.splash && m.headerStyle != headerOff && m.settings.FPS > 0
+}
+
+// armHeaderIfNeeded starts the header color tick when it should animate but none
+// is in flight, returning the Cmd (or nil). Idempotent via m.animating.
+func (m *model) armHeaderIfNeeded() tea.Cmd {
+	if m.shouldAnimateHeader() && !m.animating {
+		m.animating = true
+		return rainbowTick(m.settings.FPS)
+	}
+	return nil
+}
+
+// armSpinnerIfNeeded starts the status spinner tick when busy and none is in
+// flight, returning the Cmd (or nil). Idempotent via m.spinning.
+func (m *model) armSpinnerIfNeeded() tea.Cmd {
+	if m.busy && !m.spinning {
+		m.spinning = true
+		return m.sp.Tick
+	}
+	return nil
 }
 
 // flushQueue pops the front of the queue (if any), sends it, and re-enters

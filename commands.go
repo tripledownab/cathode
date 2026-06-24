@@ -122,7 +122,7 @@ func slashCommands() []slashCmd {
 					return *m, nil
 				}
 				m.busy = true
-				return *m, nil
+				return *m, m.armSpinnerIfNeeded()
 			},
 		},
 		{

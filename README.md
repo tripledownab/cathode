@@ -84,8 +84,10 @@ cursor, and it persists across launches:
 - `/theme` — color palette. 11 built in: **BBS** (default neon), Dracula, Nord,
   Solarized Dark, Tokyo Night, Gruvbox, One Dark, Monokai, **Catppuccin Mocha**,
   GitHub Dark, Rosé Pine.
-- `/settings` — the theme picker plus the **header animation**: rainbow sweep,
-  single-hue shimmer (cyan / amber / magenta), theme-color, pulse, or off.
+- `/settings` — the theme picker plus the **header animation** (rainbow sweep,
+  single-hue shimmer cyan / amber / magenta, theme-color, pulse, or off) and an
+  **animation FPS** cap (24 / 12 / 6 / 3) — lower means fewer idle redraws / less
+  CPU, and setting the header animation to *off* stops idle repainting entirely.
 
 The screenshots above are rendered in Catppuccin Mocha.
 

@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -13,10 +14,12 @@ import (
 // handled=false the caller should fall through to the input/viewport piping
 // so plain typing still reaches the textinput.
 func (m model) handleKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
-	// The boot splash eats the first keypress.
+	// The boot splash eats the first keypress. Dismissing it reveals the header,
+	// so start its animation tick now (this path returns early, bypassing the
+	// tick-arming at the tail of Update).
 	if m.splash {
 		m.splash = false
-		return m, nil, true
+		return m, m.armHeaderIfNeeded(), true
 	}
 	// Help modal swallows everything except dismissal keys.
 	if m.help {
@@ -46,7 +49,14 @@ func (m model) handleKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 					m.headerStyle = id
 				}
 			}
-			return m, nil, true
+			// Switching to/from "off" toggles the animation; re-arm if it should
+			// now run (no-op if a tick is already in flight).
+			return m, m.armHeaderIfNeeded(), true
+		case "fps":
+			if chosen != "" {
+				m.commitFPS(chosen)
+			}
+			return m, m.armHeaderIfNeeded(), true
 		case "theme":
 			switch {
 			case chosen != "":
@@ -81,6 +91,10 @@ func (m model) handleKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 			case "header":
 				p := newPicker("header", "HEADER ANIMATION", headerStyleItems(), m.w, m.h)
 				p.setCursorTo(m.settings.Header)
+				m.picker = p
+			case "fps":
+				p := newPicker("fps", "ANIMATION FPS", fpsItems(), m.w, m.h)
+				p.setCursorTo(strconv.Itoa(m.settings.FPS))
 				m.picker = p
 			case "theme":
 				p := newPicker("theme", "COLOR THEME", themeItems(), m.w, m.h)
@@ -276,5 +290,7 @@ func (m model) handleEnter() (model, tea.Cmd, bool) {
 	}
 	m.input.SetValue("")
 	m.busy = true
-	return m, nil, true
+	// Start the working spinner (this path returns early, so arm it here rather
+	// than relying on the tail of Update).
+	return m, m.armSpinnerIfNeeded(), true
 }

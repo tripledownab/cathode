@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
 )
 
 // Header animation style ids. These are the values persisted in settings.json
@@ -50,11 +51,58 @@ func headerStyleItems() []pickerItem {
 	return items
 }
 
+// Animation frame rate (the header wordmark) in fps. Lower = fewer redraws =
+// less CPU; the header style "off" stops the animation entirely (zero idle
+// redraws). Persisted as settings.FPS.
+const defaultFPS = 12
+
+type fpsOption struct {
+	fps         int
+	label, desc string
+}
+
+var fpsOptions = []fpsOption{
+	{24, "24 fps", "smoothest header animation — highest CPU"},
+	{12, "12 fps", "smooth (default)"},
+	{6, "6 fps", "calmer, lower CPU"},
+	{3, "3 fps", "minimal CPU while still animating"},
+}
+
+func fpsLabel(fps int) string {
+	for _, o := range fpsOptions {
+		if o.fps == fps {
+			return o.label
+		}
+	}
+	return strconv.Itoa(fps) + " fps"
+}
+
+func fpsItems() []pickerItem {
+	items := make([]pickerItem, 0, len(fpsOptions))
+	for _, o := range fpsOptions {
+		items = append(items, pickerItem{id: strconv.Itoa(o.fps), title: o.label, subtitle: o.desc})
+	}
+	return items
+}
+
+// commitFPS applies the chosen animation rate and persists it. (For zero idle
+// redraws, set the header animation itself to "off".)
+func (m *model) commitFPS(id string) {
+	fps, err := strconv.Atoi(id)
+	if err != nil || fps <= 0 {
+		return
+	}
+	m.settings.FPS = fps
+	saveSettings(m.settings)
+	m.add(entInfo, "→ animation: "+fpsLabel(fps))
+}
+
 // settingsItems is the top-level /settings menu: one row per setting, each
 // showing its current value. Selecting a row opens that setting's picker.
 func (m *model) settingsItems() []pickerItem {
 	return []pickerItem{
 		{id: "header", title: "header animation", subtitle: "current: " + headerStyleLabel(m.settings.Header)},
+		{id: "fps", title: "animation fps", subtitle: "current: " + fpsLabel(m.settings.FPS) + " · lower = less CPU"},
 		{id: "theme", title: "color theme", subtitle: "current: " + themeLabel(m.settings.Theme)},
 	}
 }
@@ -84,9 +132,12 @@ func (m *model) commitTheme(id string) {
 type settings struct {
 	Header string `json:"header"`
 	Theme  string `json:"theme"`
+	FPS    int    `json:"fps"` // header animation frame rate; 0 → defaultFPS on load
 }
 
-func defaultSettings() settings { return settings{Header: headerCyan, Theme: defaultTheme} }
+func defaultSettings() settings {
+	return settings{Header: headerCyan, Theme: defaultTheme, FPS: defaultFPS}
+}
 
 // settingsPath mirrors sessionsPath/historyPath: $XDG_STATE_HOME/cathode, else
 // ~/.local/state/cathode. Returns "" if no state dir is resolvable (load/save
@@ -117,6 +168,9 @@ func loadSettings() settings {
 	}
 	if s.Theme == "" {
 		s.Theme = defaultTheme
+	}
+	if s.FPS <= 0 {
+		s.FPS = defaultFPS
 	}
 	return s
 }
