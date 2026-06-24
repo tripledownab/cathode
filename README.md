@@ -49,6 +49,24 @@ go run .                # AUTO (build) by default; -mode ask | plan | bypass to 
 Preflight: run `claude` once interactively and confirm `/status` shows the
 subscription route (not API credits) before relying on this.
 
+## Build & install
+
+`make` wraps the `go` commands (needs Go 1.22+):
+
+```bash
+make build      # compile ./cathode
+make run        # build, then launch in ask mode
+make test       # go test ./...
+make tidy       # go mod tidy (writes go.sum)
+make install    # build + copy to ~/.local/bin  (override: make install PREFIX=/usr/local/bin)
+make uninstall  # remove the installed binary
+make reinstall  # clean + install
+make watch      # rebuild + reinstall on every *.go save (needs entr)
+make clean      # remove ./cathode
+```
+
+`install` creates `$PREFIX` if needed and warns when it isn't on your `PATH`.
+
 ## Flags
 
 | flag     | default | meaning                                                                   |

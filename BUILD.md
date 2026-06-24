@@ -4,7 +4,7 @@ Requirements: **Go 1.22+** and the **`claude` CLI** (logged in with your Pro/Max
 account: `claude login`).
 
 ```bash
-cd doorway
+cd cathode
 go mod tidy        # fetches deps + writes go.sum (needs network the first time)
 make build         # -> ./cathode     (or: go build -o cathode .)
 ./cathode
