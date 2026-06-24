@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // fuzzyScore returns (score, matched). A higher score is better. Subsequence
@@ -193,15 +194,14 @@ func (p *picker) View() string {
 		maxRows = 16
 	}
 
-	var b strings.Builder
-	b.WriteString(dTitle.Render(" " + p.title + " "))
-	b.WriteString("\n")
-	b.WriteString(p.input.View())
-	b.WriteString("\n")
+	innerW := w - 2     // text area inside the box's 1-col padding
+	listW := innerW - 1 // reserve the last column for the scrollbar gutter
 
-	if len(p.filtered) == 0 {
-		b.WriteString(cDim.Render("  (no matches)"))
-	} else {
+	header := dTitle.Render(" "+p.title+" ") + "\n" + p.input.View()
+	footer := cDim.Render("  [↑↓] move   [enter] choose   [esc] cancel")
+
+	section := cDim.Render("  (no matches)")
+	if len(p.filtered) > 0 {
 		start := 0
 		if p.cursor >= maxRows {
 			start = p.cursor - maxRows + 1
@@ -210,22 +210,28 @@ func (p *picker) View() string {
 		if end > len(p.filtered) {
 			end = len(p.filtered)
 		}
+		rows := make([]string, 0, end-start)
 		for i := start; i < end; i++ {
 			it := p.items[p.filtered[i]]
 			line := fmt.Sprintf("  %s   %s", it.title, cDim.Render(it.subtitle))
 			if i == p.cursor {
 				line = approveBar.Render(" " + it.title + "   " + it.subtitle + " ")
 			}
-			b.WriteString(line)
-			b.WriteString("\n")
+			// ANSI-aware truncate + space-pad to a fixed width so the scrollbar
+			// lands as a straight column regardless of styled content.
+			line = ansi.Truncate(line, listW, "")
+			if pad := listW - lipgloss.Width(line); pad > 0 {
+				line += strings.Repeat(" ", pad)
+			}
+			rows = append(rows, line)
 		}
-		if len(p.filtered) > maxRows {
-			b.WriteString(cDim.Render(fmt.Sprintf("  %d more…", len(p.filtered)-maxRows)))
-			b.WriteString("\n")
-		}
+		// Themed BBS scrollbar gutter, mirroring the transcript's — replaces the
+		// old "N more…" text so a long session/command list scrolls in-theme.
+		bar := bbsScrollbar(len(rows), len(p.filtered), len(rows), start)
+		section = lipgloss.JoinHorizontal(lipgloss.Top, strings.Join(rows, "\n"), bar)
 	}
-	b.WriteString(cDim.Render("  [↑↓] move   [enter] choose   [esc] cancel"))
 
+	body := header + "\n" + section + "\n" + footer
 	box := lipgloss.NewStyle().Border(lipgloss.DoubleBorder()).BorderForeground(colCyan).Padding(0, 1).Width(w)
-	return box.Render(strings.TrimRight(b.String(), "\n"))
+	return box.Render(body)
 }
