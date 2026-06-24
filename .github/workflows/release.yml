@@ -1,0 +1,65 @@
+name: release
+
+# Fires when you push a tag like v0.1.0. Cross-compiles for the three targets
+# people actually run Doorway on, attaches the binaries to a GitHub Release.
+#   git tag v0.1.0 && git push origin v0.1.0
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goos: darwin
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: linux
+            goarch: amd64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache: true
+
+      - name: tidy
+        run: go mod tidy
+
+      - name: build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+        # Embed the tag in the binary name and strip symbol/debug info so the
+        # release tarball is small. -trimpath keeps the build reproducible.
+        run: |
+          out="doorway-${GITHUB_REF_NAME}-${GOOS}-${GOARCH}"
+          go build -trimpath -ldflags="-s -w" -o "$out" .
+          tar -czf "${out}.tar.gz" "$out"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: doorway-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: doorway-*.tar.gz
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.tar.gz
+          generate_release_notes: true

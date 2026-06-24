@@ -1,0 +1,6 @@
+# built binary (Makefile outputs ./cathode) and default go name
+/cathode
+/ccharness
+*.test
+*.out
+.DS_Store
