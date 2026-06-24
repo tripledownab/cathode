@@ -1,6 +1,13 @@
-# ccharness
+# Cathode
 
-A **Bubble Tea TUI over the Claude Code stream-json protocol**.
+A **Bubble Tea TUI over the Claude Code stream-json protocol** (wordmark: `cath0d3`).
+
+<p align="center">
+  <img src="assets/cathode-splash.svg" alt="cath0d3 boot splash" width="640"><br><br>
+  <img src="assets/cathode-preview.svg" alt="cath0d3 reviewing an edit in ask mode" width="780">
+</p>
+
+<sub>Rendered in the built-in **Catppuccin Mocha** theme — the look is switchable, see <a href="#themes">Themes</a>.</sub>
 
 The agent loop, context management, tool execution, and auth all live in the
 official `claude` binary, which runs as a long-lived subprocess. This program
@@ -36,6 +43,19 @@ subscription route (not API credits) before relying on this.
 | `-model` | `""`    | pin a model (e.g. `sonnet`); empty uses the account default               |
 | `-spinner`| `bar`  | working throbber: `bar` | `shade` | `block` | `arrow` | `scan`           |
 
+## Themes
+
+The look is switchable at runtime — pick from the prompt, preview live as you move the
+cursor, and it persists across launches:
+
+- `/theme` — color palette. 11 built in: **BBS** (default neon), Dracula, Nord,
+  Solarized Dark, Tokyo Night, Gruvbox, One Dark, Monokai, **Catppuccin Mocha**,
+  GitHub Dark, Rosé Pine.
+- `/settings` — the theme picker plus the **header animation**: rainbow sweep,
+  single-hue shimmer (cyan / amber / magenta), theme-color, pulse, or off.
+
+The screenshots above are rendered in Catppuccin Mocha.
+
 ## Files
 
 | file             | role                                                            |
@@ -50,7 +70,7 @@ subscription route (not API credits) before relying on this.
 | `main.go`        | flags; wires engine + program + reader goroutine                |
 | `render_test.go` | smoke test for the markdown/rebuild path                         |
 
-## Theme
+## The BBS look (and reskinning)
 
 The look is elite-ANSI-scene BBS: base-16 neon on black, CP437 double borders,
 `░▒▓█` gradient flourishes, a block-letter wordmark, scene dividers
