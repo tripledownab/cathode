@@ -133,10 +133,32 @@ func nextCtxTier(cur int) int {
 	}
 }
 
+// shortModel condenses a model id or display label to a status-bar-sized tag:
+// the family name when recognizable (opus/sonnet/haiku — covers raw ids like
+// "claude-sonnet-4-…" and labels like "Opus (1M context)"), "default" for the
+// empty/account-default case, else the first word of whatever claude reported.
+func shortModel(s string) string {
+	switch l := strings.ToLower(s); {
+	case strings.Contains(l, "opus"):
+		return "opus"
+	case strings.Contains(l, "sonnet"):
+		return "sonnet"
+	case strings.Contains(l, "haiku"):
+		return "haiku"
+	case strings.TrimSpace(s) == "":
+		return "default"
+	default:
+		if i := strings.IndexAny(s, " ("); i > 0 {
+			return strings.ToLower(strings.TrimSpace(s[:i]))
+		}
+		return strings.ToLower(s)
+	}
+}
+
 // bbsStatus renders the DOS-style full-width status line. Each segment is
 // styled individually with the cyan background so the bar stays contiguous
 // even when nested-style chunks (the context-bar gradient) emit SGR resets.
-func bbsStatus(mode, session, branch string, cost float64, ctxTok, outTok, ctxLimit int, busy bool, spin string, width int) string {
+func bbsStatus(mode, model, session, branch string, cost float64, ctxTok, outTok, ctxLimit int, busy bool, spin string, width int) string {
 	if width < 1 {
 		width = 1
 	}
@@ -149,9 +171,11 @@ func bbsStatus(mode, session, branch string, cost float64, ctxTok, outTok, ctxLi
 		ctxPct = ctxTok * 100 / ctxLimit
 	}
 
-	// Plain segments that just need the base style.
+	// Plain segments that just need the base style. MDL is the model in use;
+	// labelled "MDL" (not "MODEL") so it doesn't leet-render as "M0D3L" right
+	// next to MODE's "M0D3".
 	plain := []string{
-		leet("ALT-X EXIT"),
+		leet("MDL") + " " + shortModel(model),
 		leet("MODE") + " " + modeLabel(mode),
 		leet("NODE") + " " + short(session),
 	}
