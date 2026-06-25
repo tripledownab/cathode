@@ -114,6 +114,8 @@ type model struct {
 	session    string
 	modelID    string
 	models     []ModelChoice // model menu from the initialize handshake; drives /model (see models.go)
+	commands   []CommandInfo // command list from the handshake; merged into the palette (built-ins + skills + plugins)
+	agents     []AgentInfo   // subagent list from the handshake; shown by /agents
 	lastCost   float64
 	// Running token totals across the session. ctxTokens is the most recent
 	// turn's "live" context size (input + cache_read + cache_creation), which

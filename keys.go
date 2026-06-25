@@ -85,8 +85,13 @@ func (m model) handleKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 			m.resumeID = chosen
 			return m, tea.Quit, true
 		case "slash":
-			nm, cmd, _ := runSlash(&m, "/"+chosen)
-			return nm, cmd, true
+			// Our commands run in-process; a claude / skill / plugin command from
+			// the merged palette isn't ours, so forward it like a typed turn.
+			if nm, cmd, handled := runSlash(&m, "/"+chosen); handled {
+				return nm, cmd, true
+			}
+			cmd := m.sendTurn("/" + chosen)
+			return m, cmd, true
 		case "model":
 			m.applyModel(chosen)
 			return m, nil, true
@@ -188,7 +193,7 @@ func (m model) handleKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 		m.picker = newPicker("sessions", "RESUME SESSION", sessionItems(m.sessions, cwd), m.w, m.h)
 		return m, nil, true
 	case "ctrl+t":
-		m.picker = newPicker("slash", "COMMANDS", slashItems(), m.w, m.h)
+		m.picker = newPicker("slash", "COMMANDS", m.paletteItems(), m.w, m.h)
 		return m, nil, true
 	case "ctrl+g":
 		// Mirrors /sidebar. Ctrl-B is tmux's default prefix, so we don't bind it.
@@ -279,30 +284,35 @@ func (m model) handleEnter() (model, tea.Cmd, bool) {
 			return nm, cmd, true
 		}
 	}
+	m.input.SetValue("")
+	cmd := m.sendTurn(text)
+	return m, cmd, true
+}
+
+// sendTurn submits text as a user turn — queued while claude is busy, otherwise
+// sent now — recording it in history and returning the working-spinner Cmd.
+// Shared by Enter (typed prompts and forwarded slash commands) and the command
+// palette, so all three reach claude the same way.
+func (m *model) sendTurn(text string) tea.Cmd {
+	m.hist.Append(text)
 	// Busy: queue the message instead of dropping it on the floor.
 	if m.busy {
 		m.queue = append(m.queue, text)
-		m.hist.Append(text)
-		m.input.SetValue("")
 		m.resizeViewport()
 		m.rebuild()
-		return m, nil, true
+		return nil
 	}
 	m.add(entUser, text)
 	if err := m.engine.Send(text); err != nil {
 		m.add(entError, "send error: "+err.Error())
-		return m, nil, true
+		return nil
 	}
-	m.hist.Append(text)
 	// Capture the first prompt for the session so the resume picker has a
 	// human-recognisable label.
 	if m.session != "" {
 		cwd, _ := os.Getwd()
 		m.sessions.Touch(m.session, m.modelID, cwd, truncFirst(text), time.Now())
 	}
-	m.input.SetValue("")
 	m.busy = true
-	// Start the working spinner (this path returns early, so arm it here rather
-	// than relying on the tail of Update).
-	return m, m.armSpinnerIfNeeded(), true
+	return m.armSpinnerIfNeeded()
 }

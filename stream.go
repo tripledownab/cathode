@@ -85,8 +85,16 @@ func (m *model) handleEvent(e Envelope) {
 		// The reply to our startup initialize carries the model list the
 		// interactive /model menu shows; cache it for the picker. Other control
 		// replies (set_model, etc.) are fire-and-forget and ignored here.
-		if r := e.Response; r != nil && r.Subtype == "success" && r.Payload != nil && len(r.Payload.Models) > 0 {
-			m.models = r.Payload.Models
+		if r := e.Response; r != nil && r.Subtype == "success" && r.Payload != nil {
+			if len(r.Payload.Models) > 0 {
+				m.models = r.Payload.Models
+			}
+			if len(r.Payload.Commands) > 0 {
+				m.commands = r.Payload.Commands
+			}
+			if len(r.Payload.Agents) > 0 {
+				m.agents = r.Payload.Agents
+			}
 		}
 	case "result":
 		m.busy = false

@@ -46,10 +46,30 @@ type ControlResp struct {
 	Payload   *InitPayload `json:"response"`
 }
 
-// InitPayload is the initialize handshake's inner payload. We only pull the
-// model list; the CLI also reports commands, agents, output styles, account.
+// InitPayload is the initialize handshake's inner payload. We pull the model
+// list (for /model) plus the command and agent lists (for the palette and
+// /agents). The CLI also reports output styles and account, which we ignore.
 type InitPayload struct {
-	Models []ModelChoice `json:"models"`
+	Models   []ModelChoice `json:"models"`
+	Commands []CommandInfo `json:"commands"`
+	Agents   []AgentInfo   `json:"agents"`
+}
+
+// CommandInfo is one entry in the initialize command list — built-in slash
+// commands, skills, and plugin commands all merged together (skills and plugin
+// commands carry a "name:desc" the same as built-ins; plugin names are
+// prefixed, e.g. "stripe:test-cards"). Drives the command palette.
+type CommandInfo struct {
+	Name         string `json:"name"`
+	Description  string `json:"description"`
+	ArgumentHint string `json:"argumentHint"`
+}
+
+// AgentInfo is one entry in the initialize agent list (built-in + plugin
+// subagents). Listed by /agents; not directly invocable, so informational.
+type AgentInfo struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
 }
 
 // ModelChoice is one entry in the initialize model list — the same set the

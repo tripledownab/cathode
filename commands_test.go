@@ -2,6 +2,36 @@ package main
 
 import "testing"
 
+// paletteItems merges our in-process commands with claude's reported commands
+// (skills + plugins), deduped by name with ours winning.
+func TestPaletteItemsMerge(t *testing.T) {
+	m := &model{commands: []CommandInfo{
+		{Name: "clear", Description: "claude's clear (should be shadowed)"},
+		{Name: "deep-research", Description: "a skill"},
+		{Name: "stripe:test-cards", Description: "a plugin command"},
+	}}
+	count := map[string]int{}
+	var clearSub string
+	for _, it := range m.paletteItems() {
+		count[it.id]++
+		if it.id == "clear" {
+			clearSub = it.subtitle
+		}
+	}
+	if count["clear"] != 1 {
+		t.Errorf("clear should appear once (ours wins), got %d", count["clear"])
+	}
+	if clearSub != "clear the transcript" {
+		t.Errorf("clear should keep OUR description, got %q", clearSub)
+	}
+	if count["deep-research"] != 1 {
+		t.Error("skill command should be listed in the palette")
+	}
+	if count["stripe:test-cards"] != 1 {
+		t.Error("plugin command should be listed in the palette")
+	}
+}
+
 // runSlash handles our own commands in-process and reports not-handled for
 // anything else (without erroring), so handleEnter forwards it to claude.
 func TestRunSlashForwarding(t *testing.T) {

@@ -143,6 +143,31 @@ func slashCommands() []slashCmd {
 			},
 		},
 		{
+			name: "commands",
+			desc: "browse all commands — built-in, skills, plugins (also ctrl+t)",
+			exec: func(m *model, _ string) (model, tea.Cmd) {
+				m.picker = newPicker("slash", "COMMANDS", m.paletteItems(), m.w, m.h)
+				return *m, nil
+			},
+		},
+		{
+			name: "agents",
+			desc: "list available subagents (built-in + plugin)",
+			exec: func(m *model, _ string) (model, tea.Cmd) {
+				if len(m.agents) == 0 {
+					m.add(entInfo, "no agents reported yet (waiting on the initialize handshake)")
+					return *m, nil
+				}
+				var b strings.Builder
+				b.WriteString("available agents:\n")
+				for _, a := range m.agents {
+					b.WriteString(fmt.Sprintf("  %-22s %s\n", a.Name, a.Description))
+				}
+				m.add(entInfo, strings.TrimRight(b.String(), "\n"))
+				return *m, nil
+			},
+		},
+		{
 			name: "sessions",
 			desc: "resume a previous session",
 			exec: func(m *model, _ string) (model, tea.Cmd) {
@@ -228,6 +253,27 @@ func slashItems() []pickerItem {
 	items := make([]pickerItem, 0, len(cmds))
 	for _, c := range cmds {
 		items = append(items, pickerItem{id: c.name, title: "/" + c.name, subtitle: c.desc})
+	}
+	sort.SliceStable(items, func(a, b int) bool { return items[a].title < items[b].title })
+	return items
+}
+
+// paletteItems is the command palette's rows: our in-process commands plus the
+// ones claude reports from the initialize handshake (built-ins, skills, and
+// plugin commands), deduped by name with ours winning — ours run locally, the
+// rest are forwarded to claude on select.
+func (m *model) paletteItems() []pickerItem {
+	items := slashItems()
+	seen := make(map[string]bool, len(items))
+	for _, it := range items {
+		seen[it.id] = true
+	}
+	for _, c := range m.commands {
+		if c.Name == "" || seen[c.Name] {
+			continue
+		}
+		seen[c.Name] = true
+		items = append(items, pickerItem{id: c.Name, title: "/" + c.Name, subtitle: c.Description})
 	}
 	sort.SliceStable(items, func(a, b int) bool { return items[a].title < items[b].title })
 	return items
