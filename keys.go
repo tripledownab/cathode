@@ -63,11 +63,11 @@ func (m model) handleKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 				m.commitTheme(chosen)
 			case m.picker == nil:
 				applyTheme(m.settings.Theme)
-				m.rebuild()
+				m.rerender()
 			default:
 				if id := m.picker.focusedID(); id != "" {
 					applyTheme(id)
-					m.rebuild()
+					m.rerender()
 				}
 			}
 			return m, nil, true

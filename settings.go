@@ -123,7 +123,7 @@ func (m *model) commitTheme(id string) {
 	applyTheme(id)
 	m.settings.Theme = id
 	saveSettings(m.settings)
-	m.rebuild()
+	m.rerender() // re-render the whole transcript in the new palette
 	m.add(entInfo, "→ theme: "+themeLabel(id))
 }
 

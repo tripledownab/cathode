@@ -28,7 +28,9 @@ func (m model) View() string {
 }
 
 // renderBackground composes the chrome + transcript + prompt + status. Pulled
-// out of View() so modal overlays can splice on top of the same image.
+// out of View() so modal overlays can splice on top of the same image. The
+// transcript body is the memoized frameBody (refreshed in Update); only the
+// animated banner and the cheap prompt/status are rebuilt every frame.
 func (m model) renderBackground() string {
 	prompt := m.input.View()
 	if m.pending != nil {
@@ -37,18 +39,11 @@ func (m model) renderBackground() string {
 			leet("ALLOW"), leet("DENY")))
 	}
 
-	bar := bbsScrollbar(m.vp.Height, m.vp.TotalLineCount(), m.vp.VisibleLineCount(), m.vp.YOffset)
-	body := lipgloss.JoinHorizontal(lipgloss.Top, m.vp.View(), bar)
-	if m.sidebar && m.w >= sidebarMinWidth {
-		cwd, _ := os.Getwd()
-		turns := 0
-		for _, e := range m.entries {
-			if e.kind == entUser {
-				turns++
-			}
-		}
-		side := bbsSidebar(m.vp.Height, m.mode, m.session, m.modelID, cwd, m.lastCost, turns)
-		body = lipgloss.JoinHorizontal(lipgloss.Top, side, body)
+	// frameBody is populated by refreshBody in the Update loop; fall back to a
+	// fresh compose for callers that render without an Update (tests, asset gen).
+	body := m.frameBody
+	if body == "" {
+		body = m.renderBody()
 	}
 
 	parts := []string{
@@ -64,4 +59,40 @@ func (m model) renderBackground() string {
 		bbsStatus(m.mode, m.session, gitBranch(), m.lastCost, m.ctxTokens, m.outTokens, m.ctxLimit, m.busy, m.sp.View(), m.w),
 	)
 	return strings.Join(parts, "\n")
+}
+
+// renderBody composes the transcript region: the viewport, its scrollbar, and
+// the optional sidebar. This is the expensive part of a frame — re-styling all
+// visible lines — so refreshBody memoizes it.
+func (m *model) renderBody() string {
+	bar := bbsScrollbar(m.vp.Height, m.vp.TotalLineCount(), m.vp.VisibleLineCount(), m.vp.YOffset)
+	body := lipgloss.JoinHorizontal(lipgloss.Top, m.vp.View(), bar)
+	if m.sidebar && m.w >= sidebarMinWidth {
+		cwd, _ := os.Getwd()
+		turns := 0
+		for _, e := range m.entries {
+			if e.kind == entUser {
+				turns++
+			}
+		}
+		side := bbsSidebar(m.vp.Height, m.mode, m.session, m.modelID, cwd, m.lastCost, turns)
+		body = lipgloss.JoinHorizontal(lipgloss.Top, side, body)
+	}
+	return body
+}
+
+// refreshBody recomputes the memoized frameBody only when something it depends
+// on changed. Called once per Update; a no-op while typing or animating (the
+// viewport, scroll offset, and sidebar data all stay put), which is what keeps
+// those frames from re-styling the whole transcript.
+func (m *model) refreshBody() {
+	k := bodyKey{
+		ver: m.contentVer, w: m.vp.Width, h: m.vp.Height, off: m.vp.YOffset, mw: m.w,
+		sidebar: m.sidebar, mode: m.mode, sess: m.session, mid: m.modelID, cost: m.lastCost,
+	}
+	if k == m.bodyKey && m.frameBody != "" {
+		return
+	}
+	m.bodyKey = k
+	m.frameBody = m.renderBody()
 }

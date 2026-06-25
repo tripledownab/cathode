@@ -15,6 +15,15 @@ import (
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
+	// Mark genuine activity (input or new output) so the idle-pausing header
+	// animation knows the screen is live. The recurring ticks (header / spinner
+	// / splash / cursor-blink) are deliberately excluded — counting them would
+	// mean an untouched screen never goes quiet.
+	switch msg.(type) {
+	case tea.KeyMsg, tea.MouseMsg, tea.WindowSizeMsg, streamMsg, pendingApprovalMsg, streamClosedMsg:
+		m.lastActivity = time.Now()
+	}
+
 	switch msg := msg.(type) {
 
 	case tea.WindowSizeMsg:
@@ -27,7 +36,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		nm, cmd, handled := m.handleKey(msg)
 		if handled {
-			return nm, cmd
+			// Handled keys return early, bypassing the tail below. Refresh the body
+			// (a handled key may have scrolled or added an entry) and re-wake the
+			// header (the key counted as activity). Both no-op when nothing changed.
+			nm.refreshBody()
+			return nm, tea.Batch(cmd, nm.armHeaderIfNeeded())
 		}
 		m = nm
 
@@ -79,6 +92,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.mode == "build" {
 			msg.req.reply <- true
 			m.add(entInfo, "✓ auto-approved "+msg.req.toolName)
+			m.refreshBody() // early return — keep the cached body current
 			return m, waitApproval(m.approvals)
 		}
 		m.pending = &msg.req
@@ -99,6 +113,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.vp, cmd = m.vp.Update(msg)
 	cmds = append(cmds, cmd)
 	m.syncScroll(msg, prevInput)
+	// Recompute the memoized transcript body if its inputs changed (a no-op on
+	// the common typing / animation frames), so View() doesn't re-style the
+	// whole viewport every message.
+	m.refreshBody()
 	// Arm the animation ticks if they should be running and aren't yet. Handlers
 	// that return early (handled keys) arm them directly, so this only has to
 	// catch the fall-through paths (stream events, resize, the ticks themselves).
@@ -111,10 +129,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
+// headerIdleAfter is how long with no key/mouse/output before the header
+// animation pauses itself. A session left untouched (e.g. overnight) then stops
+// repainting entirely — no per-frame work or allocation churn — and the next
+// keypress, scroll, or stream event wakes it via the activity stamp in Update.
+const headerIdleAfter = 45 * time.Second
+
 // shouldAnimateHeader reports whether the header wordmark's color tick should be
-// running: past the splash, an animated style, and a positive fps.
+// running: past the splash, an animated style, a positive fps, and recent
+// activity (so an idle screen goes quiet instead of redrawing forever).
 func (m *model) shouldAnimateHeader() bool {
-	return !m.splash && m.headerStyle != headerOff && m.settings.FPS > 0
+	return !m.splash && m.headerStyle != headerOff && m.settings.FPS > 0 &&
+		time.Since(m.lastActivity) < headerIdleAfter
 }
 
 // armHeaderIfNeeded starts the header color tick when it should animate but none

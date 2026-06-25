@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -34,6 +36,16 @@ type entry struct {
 	toolInput  json.RawMessage // entTool only; raw tool_use input JSON
 	toolResult string          // entToolResult only; flattened result body
 	toolError  bool            // entToolResult only; true if the tool reported an error
+}
+
+// bodyKey is every input the composed transcript body depends on. While it's
+// unchanged (e.g. typing into the prompt, or the header animating) the cached
+// frameBody is reused instead of re-styling the whole viewport each frame.
+type bodyKey struct {
+	ver, w, h, off, mw int
+	sidebar            bool
+	mode, sess, mid    string
+	cost               float64
 }
 
 // model is the Bubble Tea model. Field grouping mirrors the lifecycle:
@@ -69,16 +81,40 @@ type model struct {
 	// busy) stops redrawing instead of waking the runtime many times a second.
 	animating bool
 	spinning  bool
+	// lastActivity is when the user last did something (key/mouse) or new output
+	// arrived. The header animation pauses headerIdleAfter past it so a session
+	// left untouched overnight goes fully quiescent (no per-frame redraws / GC
+	// churn) and wakes on the next interaction. See shouldAnimateHeader.
+	lastActivity time.Time
 
-	entries  []entry
-	queue    []string          // user messages typed while busy; drained one per turn end
-	toolUses map[string]string // tool_use_id -> tool name, so tool_result events can show what they're answering
-	busy     bool
-	mode     string
-	session  string
-	modelID  string
-	models   []ModelChoice // model menu from the initialize handshake; drives /model (see models.go)
-	lastCost float64
+	entries []entry
+	// content accumulates the rendered transcript so each new entry is appended
+	// to it (O(new)) rather than re-joining every entry's render into a fresh
+	// string each message (which was O(total) per message — see rebuild). It's a
+	// pointer because the model is copied by value every Update and a
+	// strings.Builder must not be copied after use; every copy shares the one
+	// buffer, which is safe since only the Update loop (single timeline) writes
+	// it. renderedCount is how many entries are already in the buffer; cacheWidth
+	// is the wrap width they were rendered at (a width change forces a full
+	// re-render so markdown/diffs reflow).
+	content       *strings.Builder
+	renderedCount int
+	cacheWidth    int
+	// frameBody memoizes the composed transcript body (viewport + scrollbar +
+	// sidebar) — ~80% of a frame's cost, and identical between frames while you
+	// type or the wordmark shimmers. refreshBody (update.go) rebuilds it only
+	// when bodyKey changes; contentVer bumps whenever the viewport content does.
+	frameBody  string
+	bodyKey    bodyKey
+	contentVer int
+	queue      []string          // user messages typed while busy; drained one per turn end
+	toolUses   map[string]string // tool_use_id -> tool name, so tool_result events can show what they're answering
+	busy       bool
+	mode       string
+	session    string
+	modelID    string
+	models     []ModelChoice // model menu from the initialize handshake; drives /model (see models.go)
+	lastCost   float64
 	// Running token totals across the session. ctxTokens is the most recent
 	// turn's "live" context size (input + cache_read + cache_creation), which
 	// is what drives the context-pressure gauge in the status bar. outTokens
@@ -122,10 +158,11 @@ func newModel(e *Engine, mode string, a *Approvals, spin, resumeID string) model
 		splashFrame: 1,
 		logoIdx:     pickLogoIdx(),
 		w:           defW, h: defH,
-		vp:     newTranscriptViewport(defW, defH-6),
-		ready:  true,
-		follow: true,
-		mouse:  true, // started with tea.WithMouseCellMotion in main.go
+		vp:           newTranscriptViewport(defW, defH-6),
+		ready:        true,
+		follow:       true,
+		mouse:        true, // started with tea.WithMouseCellMotion in main.go
+		lastActivity: time.Now(),
 	}
 	m.input.Width = defW - 4
 	m.makeRenderer()

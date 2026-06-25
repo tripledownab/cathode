@@ -2,26 +2,64 @@ package main
 
 import "strings"
 
-// rebuild walks m.entries and writes the rendered transcript into the
-// viewport. Called on every new entry and on resize so markdown reflows.
+// rebuild writes the rendered transcript into the viewport. Each entry is
+// rendered once and appended to m.content (a retained buffer), so the common
+// case — one new entry — renders just that tail and appends O(new) bytes,
+// instead of re-running Glamour over the whole transcript AND re-joining every
+// render into a fresh O(total) string each message. A full re-render runs only
+// when the wrap width changed or entries were removed (e.g. /clear), since then
+// every render must reflow.
 func (m *model) rebuild() {
 	if !m.ready {
 		return
 	}
-	var b strings.Builder
-	for i, e := range m.entries {
-		if i > 0 {
-			b.WriteString("\n")
-		}
-		b.WriteString(m.renderEntry(e))
-		b.WriteString("\n")
+	if m.content == nil {
+		m.content = &strings.Builder{}
 	}
-	m.vp.SetContent(b.String())
+	if m.cacheWidth != m.vp.Width || m.renderedCount > len(m.entries) {
+		m.content.Reset()
+		m.renderedCount = 0
+		for _, e := range m.entries {
+			m.appendEntry(m.renderEntry(e))
+		}
+		m.cacheWidth = m.vp.Width
+	} else {
+		for i := m.renderedCount; i < len(m.entries); i++ {
+			m.appendEntry(m.renderEntry(m.entries[i]))
+		}
+	}
+	// Builder.String() hands the viewport its backing bytes without copying;
+	// appends after this only ever write past the bytes the viewport split on,
+	// so prior lines stay valid (the next rebuild re-splits anyway).
+	m.vp.SetContent(m.content.String())
+	// Content changed, so the memoized frame body (view.go) is stale.
+	m.contentVer++
 	// Only chase the bottom while following; if the user has scrolled up to
 	// read back, leave their position put (see scroll.go).
 	if m.follow {
 		m.vp.GotoBottom()
 	}
+}
+
+// appendEntry writes one entry's render to the content buffer: a blank line
+// before every entry after the first, then the render and a terminating
+// newline. This reproduces the old "join with \n\n plus a trailing \n" layout
+// while only touching the new tail.
+func (m *model) appendEntry(s string) {
+	if m.renderedCount > 0 {
+		m.content.WriteString("\n")
+	}
+	m.content.WriteString(s)
+	m.content.WriteString("\n")
+	m.renderedCount++
+}
+
+// rerender drops the per-width render cache and rebuilds from scratch. Needed
+// when something other than width changes how entries render — a theme swap or
+// a diff-style toggle — since rebuild() otherwise reuses the cached renders.
+func (m *model) rerender() {
+	m.cacheWidth = -1
+	m.rebuild()
 }
 
 // renderEntry dispatches a single transcript item to its renderer. Kept out
