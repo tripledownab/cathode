@@ -107,6 +107,23 @@ func slashCommands() []slashCmd {
 			},
 		},
 		{
+			name: "diff",
+			desc: "diff card style (unified|split)",
+			exec: func(m *model, arg string) (model, tea.Cmd) {
+				switch strings.TrimSpace(strings.ToLower(arg)) {
+				case diffUnified, diffSplit:
+					m.commitDiff(strings.TrimSpace(strings.ToLower(arg)))
+				case "":
+					p := newPicker("diff", "DIFF STYLE", diffItems(), m.w, m.h)
+					p.setCursorTo(m.settings.Diff)
+					m.picker = p
+				default:
+					m.add(entError, "unknown diff style: "+arg+" (unified|split)")
+				}
+				return *m, nil
+			},
+		},
+		{
 			name: "compact",
 			desc: "summarise older turns to free up context",
 			exec: func(m *model, _ string) (model, tea.Cmd) {

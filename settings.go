@@ -104,6 +104,7 @@ func (m *model) settingsItems() []pickerItem {
 		{id: "header", title: "header animation", subtitle: "current: " + headerStyleLabel(m.settings.Header)},
 		{id: "fps", title: "animation fps", subtitle: "current: " + fpsLabel(m.settings.FPS) + " · lower = less CPU"},
 		{id: "theme", title: "color theme", subtitle: "current: " + themeLabel(m.settings.Theme)},
+		{id: "diff", title: "diff style", subtitle: "current: " + diffLabel(m.settings.Diff)},
 	}
 }
 
@@ -132,11 +133,12 @@ func (m *model) commitTheme(id string) {
 type settings struct {
 	Header string `json:"header"`
 	Theme  string `json:"theme"`
-	FPS    int    `json:"fps"` // header animation frame rate; 0 → defaultFPS on load
+	FPS    int    `json:"fps"`  // header animation frame rate; 0 → defaultFPS on load
+	Diff   string `json:"diff"` // diff card style: "unified" or "split"
 }
 
 func defaultSettings() settings {
-	return settings{Header: headerCyan, Theme: defaultTheme, FPS: defaultFPS}
+	return settings{Header: headerCyan, Theme: defaultTheme, FPS: defaultFPS, Diff: diffUnified}
 }
 
 // settingsPath mirrors sessionsPath/historyPath: $XDG_STATE_HOME/cathode, else
@@ -171,6 +173,9 @@ func loadSettings() settings {
 	}
 	if s.FPS <= 0 {
 		s.FPS = defaultFPS
+	}
+	if s.Diff == "" {
+		s.Diff = diffUnified
 	}
 	return s
 }

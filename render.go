@@ -99,7 +99,7 @@ func (m *model) renderEntry(e entry) string {
 	case entDiff:
 		parts := make([]string, 0, len(e.diffs))
 		for _, d := range e.diffs {
-			parts = append(parts, renderDiff(d.file, d.old, d.new, m.vp.Width))
+			parts = append(parts, renderDiffFor(m.settings.Diff, d.file, d.old, d.new, m.vp.Width))
 		}
 		return strings.Join(parts, "\n")
 	case entInfo:

@@ -71,6 +71,11 @@ func (m model) handleKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 				}
 			}
 			return m, nil, true
+		case "diff":
+			if chosen != "" {
+				m.commitDiff(chosen)
+			}
+			return m, nil, true
 		}
 		if chosen == "" {
 			return m, nil, true
@@ -99,6 +104,10 @@ func (m model) handleKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 			case "theme":
 				p := newPicker("theme", "COLOR THEME", themeItems(), m.w, m.h)
 				p.setCursorTo(m.settings.Theme)
+				m.picker = p
+			case "diff":
+				p := newPicker("diff", "DIFF STYLE", diffItems(), m.w, m.h)
+				p.setCursorTo(m.settings.Diff)
 				m.picker = p
 			}
 			return m, nil, true
