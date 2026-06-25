@@ -22,6 +22,11 @@ func (m *model) handleEvent(e Envelope) {
 			// /compact streams these: "compacting" then a success/failed result.
 			switch {
 			case e.CompactResult == "success":
+				// The exact post-compact context size isn't reported here — it
+				// arrives with the next turn's usage. Zero the gauge now so it
+				// reflects the freeing immediately instead of staying stuck at the
+				// pre-compact level; observeCtx refines it on the next reply.
+				m.ctxTokens = 0
 				m.add(entInfo, "✓ context compacted")
 			case e.CompactResult == "failed":
 				m.add(entInfo, "✗ compact: "+e.CompactError)
