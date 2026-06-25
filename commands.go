@@ -200,9 +200,11 @@ func slashCommands() []slashCmd {
 	}
 }
 
-// runSlash dispatches "/name [arg]" against the slash command table. Returns
-// (newModel, cmd, true) when the line was a slash command, else (_, _, false)
-// so the caller falls back to sending the line as a normal prompt.
+// runSlash dispatches "/name [arg]" against our in-process command table.
+// Returns handled=true when a command ran; handled=false when the line isn't a
+// slash command OR isn't one of ours — in the latter case the caller forwards
+// it to claude verbatim, so claude's built-in / custom / plugin slash commands
+// still work (we don't reject what we don't recognize).
 func runSlash(m *model, line string) (model, tea.Cmd, bool) {
 	line = strings.TrimSpace(line)
 	if !strings.HasPrefix(line, "/") {
@@ -217,8 +219,7 @@ func runSlash(m *model, line string) (model, tea.Cmd, bool) {
 			return nm, cmd, true
 		}
 	}
-	m.add(entError, "unknown command: /"+name+" (try /help)")
-	return *m, nil, true
+	return *m, nil, false
 }
 
 // slashItems projects the slash command table into picker rows.
@@ -270,5 +271,6 @@ func helpText() string {
 	for _, c := range cmds {
 		b.WriteString(fmt.Sprintf("  /%-10s %s\n", c.name, c.desc))
 	}
+	b.WriteString("  any other /command is forwarded to claude (custom & plugin commands)\n")
 	return strings.TrimRight(b.String(), "\n")
 }

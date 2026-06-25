@@ -268,13 +268,16 @@ func (m model) handleEnter() (model, tea.Cmd, bool) {
 	if text == "" {
 		return m, nil, false
 	}
-	// Slash command intercept: "/foo [arg]" runs in-process instead of going
-	// to the claude subprocess.
+	// Slash command intercept: our in-process commands run here. A command we
+	// don't recognize is NOT an error — it falls through to the send path below
+	// and goes to claude as a normal turn, so claude's own / custom / plugin
+	// slash commands (and prompt templates) still run, the way /compact does.
 	if strings.HasPrefix(text, "/") {
-		m.input.SetValue("")
-		m.hist.Append(text)
-		nm, cmd, _ := runSlash(&m, text)
-		return nm, cmd, true
+		if nm, cmd, handled := runSlash(&m, text); handled {
+			nm.input.SetValue("")
+			nm.hist.Append(text)
+			return nm, cmd, true
+		}
 	}
 	// Busy: queue the message instead of dropping it on the floor.
 	if m.busy {
