@@ -36,10 +36,38 @@ func TestGenerateAssets(t *testing.T) {
 	} {
 		// Canvas + default text from the active palette (Catppuccin base #1e1e2e
 		// and text #cdd6f4) so unstyled cells sit on-theme, not on BBS black/white.
-		if err := os.WriteFile(a.path, []byte(ansiToSVG(a.screen, string(colBlack), string(colWhite))), 0o644); err != nil {
+		if err := os.WriteFile(a.path, []byte(ansiToSVG(a.screen, hexOf(colBlack), hexOf(colWhite))), 0o644); err != nil {
 			t.Fatalf("write %s: %v", a.path, err)
 		}
 		t.Logf("wrote %s", a.path)
+	}
+}
+
+// TestGenerateThemeAssets renders the ask-mode preview scene once per color
+// theme into assets/themes/<id>.svg, so the docs can show every palette without
+// a live capture. Same opt-in as the marketing assets:
+//
+//	CATHODE_GENASSETS=1 go test -run TestGenerateThemeAssets
+//
+// hexOf resolves the canvas/default colors so the BBS palette's ANSI indices
+// ("0"/"15") become real hex; the basic-SGR path in ansisvg_test.go does the
+// same for its body, so the neon-on-black theme renders like every other one.
+func TestGenerateThemeAssets(t *testing.T) {
+	if os.Getenv("CATHODE_GENASSETS") == "" {
+		t.Skip("set CATHODE_GENASSETS=1 to regenerate assets/themes/*.svg")
+	}
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	if err := os.MkdirAll("assets/themes", 0o755); err != nil {
+		t.Fatalf("mkdir assets/themes: %v", err)
+	}
+	for _, th := range themes {
+		applyTheme(th.id)
+		svg := ansiToSVG(genPreviewScreen(), hexOf(colBlack), hexOf(colWhite))
+		path := "assets/themes/" + th.id + ".svg"
+		if err := os.WriteFile(path, []byte(svg), 0o644); err != nil {
+			t.Fatalf("write %s: %v", path, err)
+		}
+		t.Logf("wrote %s", path)
 	}
 }
 

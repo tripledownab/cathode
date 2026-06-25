@@ -144,8 +144,42 @@ func applySGR(params string, fg, bg *string, bold *bool) {
 				*target = xterm256Hex(toks[k+2])
 				k += 2
 			}
+		default:
+			// Basic 16-color SGR (what lipgloss emits for ANSI-index palette
+			// colors like the BBS theme's "14"): 30-37/90-97 fg, 40-47/100-107 bg.
+			switch n := atoi(toks[k]); {
+			case n >= 30 && n <= 37:
+				*fg = ansi16[n-30]
+			case n >= 90 && n <= 97:
+				*fg = ansi16[n-90+8]
+			case n >= 40 && n <= 47:
+				*bg = ansi16[n-40]
+			case n >= 100 && n <= 107:
+				*bg = ansi16[n-100+8]
+			}
 		}
 	}
+}
+
+// ansi16 is the conventional xterm RGB for the 16 base ANSI colors, shared by
+// the basic-SGR path above and the 0-15 fallback in xterm256Hex.
+var ansi16 = []string{
+	"#000000", "#cd0000", "#00cd00", "#cdcd00", "#0000ee", "#cd00cd", "#00cdcd", "#e5e5e5",
+	"#7f7f7f", "#ff0000", "#00ff00", "#ffff00", "#5c5cff", "#ff00ff", "#00ffff", "#ffffff",
+}
+
+// hexOf resolves a palette color to a concrete "#rrggbb" for the SVG canvas
+// (background / default text), where a bare ANSI index like "0" or "15" — used
+// by the BBS palette — isn't a valid color. Hex values pass through unchanged.
+func hexOf(c lipgloss.Color) string {
+	s := string(c)
+	if strings.HasPrefix(s, "#") {
+		return s
+	}
+	if n, err := strconv.Atoi(strings.TrimSpace(s)); err == nil && n >= 0 && n < len(ansi16) {
+		return ansi16[n]
+	}
+	return s
 }
 
 func rgbHex(r, g, b string) string {
@@ -168,10 +202,8 @@ func xterm256Hex(s string) string {
 			return 55 + c*40
 		}
 		return fmt.Sprintf("#%02x%02x%02x", conv(n/36), conv((n/6)%6), conv(n%6))
-	default: // 0..15 — approximate with the cube's primaries
-		base := []string{"#000000", "#cd0000", "#00cd00", "#cdcd00", "#0000ee", "#cd00cd", "#00cdcd", "#e5e5e5",
-			"#7f7f7f", "#ff0000", "#00ff00", "#ffff00", "#5c5cff", "#ff00ff", "#00ffff", "#ffffff"}
-		return base[n%16]
+	default: // 0..15 — the conventional base-16 colors
+		return ansi16[n%16]
 	}
 }
 
