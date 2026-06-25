@@ -76,6 +76,10 @@ func (m *model) renderEntry(e entry) string {
 			}
 		}
 		return cName.Render(ornBullet+" "+studly("claude")) + "\n" + body
+	case entThinking:
+		// Extended thinking: dim + italic so it reads as the model's scratch work,
+		// visually subordinate to the actual reply.
+		return cDim.Render(ornBullet+" "+studly("thinking")) + "\n" + cDim.Italic(true).Render(e.text)
 	case entTool:
 		// Typed renderer when we still have the structured input; falls back
 		// to the legacy "name\nJSON" format otherwise.

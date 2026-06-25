@@ -32,6 +32,12 @@ type Envelope struct {
 	CompactResult string `json:"compact_result"`
 	CompactError  string `json:"compact_error"`
 
+	// system/hook_response fields — we surface only failing/blocking hooks.
+	HookName string `json:"hook_name"`
+	ExitCode int    `json:"exit_code"`
+	Outcome  string `json:"outcome"`
+	Stderr   string `json:"stderr"`
+
 	// control_response-only (e.g. the reply to our initialize handshake)
 	Response *ControlResp `json:"response"`
 }
@@ -106,6 +112,9 @@ type ContentBlock struct {
 
 	// type == "text"
 	Text string `json:"text"`
+
+	// type == "thinking" (extended thinking)
+	Thinking string `json:"thinking"`
 
 	// type == "tool_use"
 	ID    string          `json:"id"`

@@ -18,6 +18,21 @@ func (m *model) handleEvent(e Envelope) {
 			cwd, _ := os.Getwd()
 			m.sessions.Touch(e.Session, e.Model, cwd, "", time.Now())
 			m.add(entInfo, fmt.Sprintf("— session %s · %s —", short(e.Session), e.Model))
+		case "hook_response":
+			// Routine successful hooks (SessionStart, PreToolUse, …) fire constantly
+			// and would flood the transcript, so stay silent on those. Surface only a
+			// hook that failed or blocked — otherwise a tool silently not running is
+			// a mystery.
+			if e.ExitCode != 0 || (e.Outcome != "" && e.Outcome != "success") {
+				msg := "⚙ hook " + e.HookName
+				if e.Outcome != "" {
+					msg += " " + e.Outcome
+				}
+				if s := strings.TrimSpace(e.Stderr); s != "" {
+					msg += ": " + s
+				}
+				m.add(entError, msg)
+			}
 		case "status":
 			// /compact streams these: "compacting" then a success/failed result.
 			switch {
@@ -50,6 +65,12 @@ func (m *model) handleEvent(e Envelope) {
 			case "text":
 				if t := strings.TrimSpace(b.Text); t != "" {
 					m.add(entClaude, t)
+				}
+			case "thinking":
+				// Extended thinking — show it (dim) when present; many turns carry
+				// an empty/again-signed block we just skip.
+				if t := strings.TrimSpace(b.Thinking); t != "" {
+					m.add(entThinking, t)
 				}
 			case "tool_use":
 				// Remember the name so the tool_result event can label itself.

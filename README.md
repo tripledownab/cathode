@@ -23,8 +23,9 @@ subscription** because we never set an API key.
 - **Visual diff cards** — `Edit` / `Write` / `MultiEdit` render as line-numbered red/green diffs instead of raw JSON, unified or side-by-side **split** (`/diff` or `/settings`).
 - **Markdown replies** — Claude's output is rendered with Glamour and reflows on resize.
 - **Clickable links** — `http(s)` URLs in the transcript are wrapped as OSC 8 terminal hyperlinks (Cmd/Ctrl-click, or a plain click with `/mouse` off).
+- **Extended thinking** — the model's reasoning renders dim above its reply; a hook that blocks or fails surfaces too (routine ones stay quiet).
 - **Session resume** — `ctrl+r` (or `/sessions`) fuzzy-filters `claude`'s own session history and re-execs into the one you pick.
-- **Command palette** — `ctrl+t` runs slash commands: `/model`, `/compact`, `/mouse`, `/cwd`, `/clear`, …
+- **Command palette** — `ctrl+t` (or `/commands`) browses every command — our in-process ones plus claude's built-ins, **skills**, and **plugin** commands (from the init handshake) — and runs or forwards the one you pick; `/agents` lists subagents. Any `/command` we don't own is forwarded to claude, so custom & plugin commands work.
 - **11 themes + header animations** — `/theme` and `/settings`, with live preview, persisted across launches (see [Themes](#themes)).
 - **Live status bar** — permission mode, session id, git branch, a context-pressure gauge that auto-grows 200K → 2M, output tokens, and running cost.
 - **Info sidebar** — `ctrl+g` / `/sidebar` toggles an at-a-glance BBS info rail.

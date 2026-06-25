@@ -21,6 +21,7 @@ type entryKind int
 const (
 	entUser entryKind = iota
 	entClaude
+	entThinking
 	entTool
 	entToolResult
 	entDiff
