@@ -20,12 +20,12 @@ func (m *model) rebuild() {
 		m.content.Reset()
 		m.renderedCount = 0
 		for _, e := range m.entries {
-			m.appendEntry(m.renderEntry(e))
+			m.appendEntry(linkify(m.renderEntry(e)))
 		}
 		m.cacheWidth = m.vp.Width
 	} else {
 		for i := m.renderedCount; i < len(m.entries); i++ {
-			m.appendEntry(m.renderEntry(m.entries[i]))
+			m.appendEntry(linkify(m.renderEntry(m.entries[i])))
 		}
 	}
 	// Builder.String() hands the viewport its backing bytes without copying;

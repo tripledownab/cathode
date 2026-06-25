@@ -22,6 +22,7 @@ subscription** because we never set an API key.
 - **Inline approvals** — in `ask` mode every gated tool call raises a `[ENTER] allow · [ESC] deny` bar (served by a hand-rolled in-process MCP permission server); edits show the diff before you decide.
 - **Visual diff cards** — `Edit` / `Write` / `MultiEdit` render as line-numbered red/green diffs instead of raw JSON, unified or side-by-side **split** (`/diff` or `/settings`).
 - **Markdown replies** — Claude's output is rendered with Glamour and reflows on resize.
+- **Clickable links** — `http(s)` URLs in the transcript are wrapped as OSC 8 terminal hyperlinks (Cmd/Ctrl-click, or a plain click with `/mouse` off).
 - **Session resume** — `ctrl+r` (or `/sessions`) fuzzy-filters `claude`'s own session history and re-execs into the one you pick.
 - **Command palette** — `ctrl+t` runs slash commands: `/model`, `/compact`, `/mouse`, `/cwd`, `/clear`, …
 - **11 themes + header animations** — `/theme` and `/settings`, with live preview, persisted across launches (see [Themes](#themes)).
