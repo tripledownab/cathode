@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -140,13 +141,26 @@ func (e *Engine) Send(text string) error {
 	return nil
 }
 
-// Close ends the session: closing stdin lets claude exit cleanly, then we wait.
+// Close ends the session. Call it AFTER the Bubble Tea program exits (p.Run
+// returned), never from the Update loop: Wait() blocks until claude exits, and
+// from inside Update that deadlocks against the Pipe goroutine (Update stops
+// draining p.Send, Pipe stops draining stdout, claude blocks writing and never
+// exits). Post-Run, p.Send is a no-op so Pipe keeps draining and an idle claude
+// exits promptly on stdin EOF; a busy one is killed after a short grace.
 func (e *Engine) Close() {
 	if e.stdin != nil {
-		_ = e.stdin.Close()
+		_ = e.stdin.Close() // EOF asks an idle claude to exit cleanly
 	}
-	if e.cmd != nil && e.cmd.Process != nil {
-		_ = e.cmd.Wait()
+	if e.cmd == nil || e.cmd.Process == nil {
+		return
+	}
+	done := make(chan struct{})
+	go func() { _ = e.cmd.Wait(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		_ = e.cmd.Process.Kill()
+		<-done // reap so we don't leave a zombie
 	}
 }
 

@@ -232,7 +232,7 @@ func slashCommands() []slashCmd {
 			name: "quit",
 			desc: "exit cathode",
 			exec: func(m *model, _ string) (model, tea.Cmd) {
-				m.engine.Close()
+				// Quit; the subprocess is closed in main after Run() (Engine.Close).
 				return *m, tea.Quit
 			},
 		},

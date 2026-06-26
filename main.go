@@ -126,13 +126,16 @@ func main() {
 	go engine.Pipe(p)
 
 	final, err := p.Run()
+	// Tear down the subprocess here, not in the Update loop: Close() blocks on
+	// Wait(), which deadlocks against the Pipe goroutine while the program is
+	// live. Once Run() has returned, p.Send is a no-op so Pipe keeps draining
+	// stdout and claude exits cleanly (see Engine.Close).
+	engine.Close()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "tui error:", err)
-		engine.Close()
 		os.Exit(1)
 	}
 	if fm, ok := final.(model); ok && fm.resumeID != "" {
-		engine.Close()
 		args := buildResumeArgv(os.Args, fm.resumeID)
 		// syscall.Exec calls execve(2) directly — no $PATH lookup — so
 		// os.Args[0] (often the bare name "doorway") would resolve relative

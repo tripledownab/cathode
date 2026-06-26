@@ -218,7 +218,8 @@ func (m model) handleKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 
 	switch msg.Type {
 	case tea.KeyCtrlC:
-		m.engine.Close()
+		// Just quit — the subprocess is closed in main after Run() returns.
+		// Closing it here would block the Update loop (see Engine.Close).
 		return m, tea.Quit, true
 	case tea.KeyEsc:
 		return m.handleEsc()
@@ -239,7 +240,6 @@ func (m model) handleApprovalKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 		return m, waitApproval(m.approvals), true
 	case "ctrl+c":
 		m.pending.reply <- false
-		m.engine.Close()
 		return m, tea.Quit, true
 	default:
 		m.pending.reply <- true
@@ -271,7 +271,6 @@ func (m model) handleEsc() (model, tea.Cmd, bool) {
 		m.busy = false
 		return m, nil, true
 	}
-	m.engine.Close()
 	return m, tea.Quit, true
 }
 
