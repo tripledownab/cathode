@@ -28,7 +28,7 @@ subscription** because we never set an API key.
 - **Command palette** — `ctrl+t` (or `/commands`) browses every command — our in-process ones plus claude's built-ins, **skills**, and **plugin** commands (from the init handshake) — and runs or forwards the one you pick; `/agents` lists subagents. Any `/command` we don't own is forwarded to claude, so custom & plugin commands work.
 - **11 themes + header animations** — `/theme` and `/settings`, with live preview, persisted across launches (see [Themes](#themes)).
 - **Live status bar** — permission mode, session id, git branch, a context-pressure gauge that auto-grows 200K → 2M, output tokens, and running cost.
-- **Info sidebar** — `ctrl+g` / `/sidebar` toggles an at-a-glance BBS info rail.
+- **Info sidebar** — `ctrl+g` / `/sidebar` toggles an at-a-glance BBS info rail; `/sidebar left|right` (or `/settings`) sets the side it docks to (default right).
 - **Bring your own tools** — point `-mcp` at a `.mcp.json` to wire extra MCP tools alongside the built-in approvals server.
 - **Prompt history & queueing** — `↑` / `↓` recalls past prompts; type while Claude is busy and messages queue, draining one per turn.
 
@@ -90,8 +90,9 @@ cursor, and it persists across launches:
   single-hue shimmer cyan / amber / magenta, theme-color, pulse, or off), an
   **animation FPS** cap (24 / 12 / 6 / 3) — lower means fewer idle redraws / less
   CPU, and setting the header animation to *off* stops idle repainting entirely —
-  and a **diff style** (unified single-column, or side-by-side *split* that falls
-  back to unified on narrow terminals).
+  a **diff style** (unified single-column, or side-by-side *split* that falls
+  back to unified on narrow terminals), and the **sidebar position** (right by
+  default, or left).
   The animation also auto-pauses after ~45 s with no keypress, scroll, or output,
   so a session left untouched (e.g. overnight) stops repainting the banner and
   wakes on the next interaction.

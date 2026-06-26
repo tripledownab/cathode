@@ -76,6 +76,11 @@ func (m model) handleKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 				m.commitDiff(chosen)
 			}
 			return m, nil, true
+		case "sidebarpos":
+			if chosen != "" {
+				m.commitSidebarPos(chosen)
+			}
+			return m, nil, true
 		}
 		if chosen == "" {
 			return m, nil, true
@@ -113,6 +118,10 @@ func (m model) handleKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 			case "diff":
 				p := newPicker("diff", "DIFF STYLE", diffItems(), m.w, m.h)
 				p.setCursorTo(m.settings.Diff)
+				m.picker = p
+			case "sidebarpos":
+				p := newPicker("sidebarpos", "SIDEBAR POSITION", sidebarPosItems(), m.w, m.h)
+				p.setCursorTo(m.settings.Sidebar)
 				m.picker = p
 			}
 			return m, nil, true

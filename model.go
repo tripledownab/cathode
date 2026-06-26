@@ -45,6 +45,7 @@ type entry struct {
 type bodyKey struct {
 	ver, w, h, off, mw int
 	sidebar            bool
+	sidePos            string
 	mode, sess, mid    string
 	cost               float64
 }

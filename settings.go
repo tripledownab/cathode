@@ -105,6 +105,7 @@ func (m *model) settingsItems() []pickerItem {
 		{id: "fps", title: "animation fps", subtitle: "current: " + fpsLabel(m.settings.FPS) + " · lower = less CPU"},
 		{id: "theme", title: "color theme", subtitle: "current: " + themeLabel(m.settings.Theme)},
 		{id: "diff", title: "diff style", subtitle: "current: " + diffLabel(m.settings.Diff)},
+		{id: "sidebarpos", title: "sidebar position", subtitle: "current: " + sidebarLabel(m.settings.Sidebar)},
 	}
 }
 
@@ -131,14 +132,15 @@ func (m *model) commitTheme(id string) {
 // settings is the persisted user config. Small and forward-compatible: unknown
 // fields are ignored on load, missing ones take their default.
 type settings struct {
-	Header string `json:"header"`
-	Theme  string `json:"theme"`
-	FPS    int    `json:"fps"`  // header animation frame rate; 0 → defaultFPS on load
-	Diff   string `json:"diff"` // diff card style: "unified" or "split"
+	Header  string `json:"header"`
+	Theme   string `json:"theme"`
+	FPS     int    `json:"fps"`     // header animation frame rate; 0 → defaultFPS on load
+	Diff    string `json:"diff"`    // diff card style: "unified" or "split"
+	Sidebar string `json:"sidebar"` // info-rail side: "right" (default) or "left"
 }
 
 func defaultSettings() settings {
-	return settings{Header: headerCyan, Theme: defaultTheme, FPS: defaultFPS, Diff: diffUnified}
+	return settings{Header: headerCyan, Theme: defaultTheme, FPS: defaultFPS, Diff: diffUnified, Sidebar: sidebarRight}
 }
 
 // settingsPath mirrors sessionsPath/historyPath: $XDG_STATE_HOME/cathode, else
@@ -176,6 +178,9 @@ func loadSettings() settings {
 	}
 	if s.Diff == "" {
 		s.Diff = diffUnified
+	}
+	if s.Sidebar == "" {
+		s.Sidebar = sidebarRight
 	}
 	return s
 }

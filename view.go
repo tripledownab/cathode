@@ -75,8 +75,12 @@ func (m *model) renderBody() string {
 				turns++
 			}
 		}
-		side := bbsSidebar(m.vp.Height, m.mode, m.session, m.modelID, cwd, m.lastCost, turns)
-		body = lipgloss.JoinHorizontal(lipgloss.Top, side, body)
+		side := bbsSidebar(m.vp.Height, m.settings.Sidebar, m.mode, m.session, m.modelID, cwd, m.lastCost, turns)
+		if m.settings.Sidebar == sidebarLeft {
+			body = lipgloss.JoinHorizontal(lipgloss.Top, side, body)
+		} else {
+			body = lipgloss.JoinHorizontal(lipgloss.Top, body, side)
+		}
 	}
 	return body
 }
@@ -88,7 +92,7 @@ func (m *model) renderBody() string {
 func (m *model) refreshBody() {
 	k := bodyKey{
 		ver: m.contentVer, w: m.vp.Width, h: m.vp.Height, off: m.vp.YOffset, mw: m.w,
-		sidebar: m.sidebar, mode: m.mode, sess: m.session, mid: m.modelID, cost: m.lastCost,
+		sidebar: m.sidebar, sidePos: m.settings.Sidebar, mode: m.mode, sess: m.session, mid: m.modelID, cost: m.lastCost,
 	}
 	if k == m.bodyKey && m.frameBody != "" {
 		return

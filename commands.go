@@ -191,8 +191,22 @@ func slashCommands() []slashCmd {
 		},
 		{
 			name: "sidebar",
-			desc: "toggle the BBS info rail",
-			exec: func(m *model, _ string) (model, tea.Cmd) {
+			desc: "toggle the BBS info rail (or /sidebar left|right)",
+			exec: func(m *model, arg string) (model, tea.Cmd) {
+				// "/sidebar left|right" sets the side (and shows it); bare toggles.
+				switch strings.TrimSpace(strings.ToLower(arg)) {
+				case sidebarLeft, sidebarRight:
+					if !m.sidebar {
+						m.sidebar = true
+						m.resizeViewport()
+					}
+					m.commitSidebarPos(strings.TrimSpace(strings.ToLower(arg)))
+					return *m, nil
+				case "":
+				default:
+					m.add(entError, "usage: /sidebar [left|right]")
+					return *m, nil
+				}
 				m.sidebar = !m.sidebar
 				m.resizeViewport()
 				m.rebuild()

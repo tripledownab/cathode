@@ -12,6 +12,45 @@ const (
 	sidebarMinWidth = 72 // sidebar(32) + scrollbar(1) + transcript ≥39
 )
 
+// Sidebar position (persisted as settings.Sidebar): which side of the transcript
+// the info rail sits on. The divider border flips to face the transcript.
+const (
+	sidebarRight = "right" // default
+	sidebarLeft  = "left"
+)
+
+type sidebarOption struct{ id, label, desc string }
+
+var sidebarOptions = []sidebarOption{
+	{sidebarRight, "right", "info rail on the right of the transcript (default)"},
+	{sidebarLeft, "left", "info rail on the left of the transcript"},
+}
+
+func sidebarLabel(id string) string {
+	for _, o := range sidebarOptions {
+		if o.id == id {
+			return o.label
+		}
+	}
+	return id
+}
+
+func sidebarPosItems() []pickerItem {
+	items := make([]pickerItem, 0, len(sidebarOptions))
+	for _, o := range sidebarOptions {
+		items = append(items, pickerItem{id: o.id, title: o.label, subtitle: o.desc})
+	}
+	return items
+}
+
+// commitSidebarPos persists the side the info rail sits on. The body memo keys
+// on it (see bodyKey), so the next frame repositions the rail.
+func (m *model) commitSidebarPos(id string) {
+	m.settings.Sidebar = id
+	saveSettings(m.settings)
+	m.add(entInfo, "→ sidebar: "+sidebarLabel(id))
+}
+
 var sidebarBox lipgloss.Style
 
 // buildSidebarStyles rebuilds the sidebar box from the active palette. Called
@@ -27,7 +66,7 @@ func buildSidebarStyles() {
 // as "—" so columns stay aligned. Each row is truncated to the content area so
 // nothing wraps to a second visual line, which would inflate the sidebar's
 // height and push the banner off the top via JoinHorizontal.
-func bbsSidebar(height int, mode, session, modelID, cwd string, cost float64, turns int) string {
+func bbsSidebar(height int, pos, mode, session, modelID, cwd string, cost float64, turns int) string {
 	if height < 1 {
 		height = 1
 	}
@@ -83,5 +122,8 @@ func bbsSidebar(height int, mode, session, modelID, cwd string, cost float64, tu
 	if len(rows) > height {
 		rows = rows[:height]
 	}
-	return sidebarBox.Width(sidebarWidth).Height(height).Render(strings.Join(rows, "\n"))
+	// Border faces the transcript: on the right when the rail is on the left,
+	// on the left when it's on the right.
+	box := sidebarBox.Border(lipgloss.DoubleBorder(), false, pos == sidebarLeft, false, pos != sidebarLeft)
+	return box.Width(sidebarWidth).Height(height).Render(strings.Join(rows, "\n"))
 }
