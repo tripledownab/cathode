@@ -6,11 +6,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
-	"github.com/charmbracelet/bubbles/textinput"
+	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"
+	"github.com/charmbracelet/lipgloss"
 )
 
 // entryKind tags one item in the transcript so rebuild() can dispatch to the
@@ -73,7 +75,7 @@ type model struct {
 	headerStyle string   // live header animation id; previewed in /settings, committed to settings.Header
 
 	vp    viewport.Model
-	input textinput.Model
+	input textarea.Model
 	sp    spinner.Model
 	// follow pins the transcript to the latest line while Claude streams;
 	// cleared when the user scrolls up to read back (see scroll.go).
@@ -132,12 +134,25 @@ type model struct {
 	w, h      int
 }
 
+// newPromptArea builds the multi-line prompt input. Single source of truth for
+// its config so tests exercise the real keymap: Enter is reserved for sending
+// (handled in handleEnter), so the textarea's newline binding is rebound to
+// alt+enter / ctrl+j (plus a trailing "\" + enter — see handleEnter).
+func newPromptArea() textarea.Model {
+	ta := textarea.New()
+	ta.Placeholder = "Ask Claude…  (enter sends · alt+enter / ctrl+j / \\↵ for a new line)"
+	ta.Prompt = "› "
+	ta.CharLimit = 0
+	ta.ShowLineNumbers = false
+	ta.FocusedStyle.CursorLine = lipgloss.NewStyle() // no current-line highlight bar
+	ta.KeyMap.InsertNewline = key.NewBinding(key.WithKeys("alt+enter", "ctrl+j"))
+	ta.SetHeight(1)
+	return ta
+}
+
 func newModel(e *Engine, mode string, a *Approvals, spin, resumeID string) model {
-	ti := textinput.New()
-	ti.Placeholder = "Ask Claude…  (enter to send, esc to quit)"
-	ti.Focus()
-	ti.Prompt = "› "
-	ti.CharLimit = 0
+	ta := newPromptArea()
+	ta.Focus()
 
 	sp := spinner.New()
 	sp.Spinner = bbsSpinner(spin)
@@ -153,7 +168,7 @@ func newModel(e *Engine, mode string, a *Approvals, spin, resumeID string) model
 		engine: e, approvals: a,
 		hist:     openHistory(),
 		sessions: openSessionStore(),
-		input:    ti, sp: sp,
+		input:    ta, sp: sp,
 		settings: st, headerStyle: st.Header,
 		mode: mode, splash: true,
 		// Start at frame 1 so the wordmark is visible on the first paint;
@@ -168,7 +183,7 @@ func newModel(e *Engine, mode string, a *Approvals, spin, resumeID string) model
 		mouse:        true, // started with tea.WithMouseCellMotion in main.go
 		lastActivity: time.Now(),
 	}
-	m.input.Width = defW - 4
+	m.input.SetWidth(defW - 4)
 	m.makeRenderer()
 	// On resume, replay the last N turns from claude's own JSONL so the
 	// transcript isn't empty after re-exec. claude itself loads the session
@@ -206,7 +221,7 @@ func (m model) Init() tea.Cmd {
 	// The spinner and header ticks are armed lazily (only while busy / while the
 	// header animates) so an idle screen stops redrawing — see armSpinnerIfNeeded
 	// and armHeaderIfNeeded in update.go.
-	cmds := []tea.Cmd{textinput.Blink, splashTick(), requestModels(m.engine)}
+	cmds := []tea.Cmd{m.input.Focus(), splashTick(), requestModels(m.engine)}
 	if m.approvals != nil {
 		cmds = append(cmds, waitApproval(m.approvals))
 	}

@@ -28,17 +28,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.WindowSizeMsg:
 		m.w, m.h = msg.Width, msg.Height
+		m.input.SetWidth(msg.Width - 4)
 		m.resizeViewport()
-		m.input.Width = msg.Width - 4
 		m.makeRenderer()
 		m.rebuild()
 
 	case tea.KeyMsg:
 		nm, cmd, handled := m.handleKey(msg)
 		if handled {
-			// Handled keys return early, bypassing the tail below. Refresh the body
-			// (a handled key may have scrolled or added an entry) and re-wake the
-			// header (the key counted as activity). Both no-op when nothing changed.
+			// Handled keys return early, bypassing the tail below. Resize the prompt
+			// (a handled key may have changed its line count), refresh the body (it
+			// may have scrolled or added an entry), and re-wake the header (the key
+			// counted as activity). All no-op when nothing changed.
+			nm.syncPromptHeight()
 			nm.refreshBody()
 			return nm, tea.Batch(cmd, nm.armHeaderIfNeeded())
 		}
@@ -113,9 +115,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.vp, cmd = m.vp.Update(msg)
 	cmds = append(cmds, cmd)
 	m.syncScroll(msg, prevInput)
-	// Recompute the memoized transcript body if its inputs changed (a no-op on
-	// the common typing / animation frames), so View() doesn't re-style the
-	// whole viewport every message.
+	// Grow/shrink the prompt to fit its line count (resizes the viewport when it
+	// changes), then recompute the memoized transcript body if its inputs changed
+	// (a no-op on the common typing / animation frames).
+	m.syncPromptHeight()
 	m.refreshBody()
 	// Arm the animation ticks if they should be running and aren't yet. Handlers
 	// that return early (handled keys) arm them directly, so this only has to

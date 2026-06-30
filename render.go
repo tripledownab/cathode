@@ -118,7 +118,7 @@ func (m *model) renderEntry(e entry) string {
 // the sidebar flag, and the pending-tray height. Call after anything that
 // changes those (window resize, sidebar toggle, queue mutation).
 func (m *model) resizeViewport() {
-	vpH := m.h - 6 // banner(3) + divider(1) + prompt(1) + status(1)
+	vpH := m.h - 5 - m.promptRows() // banner(3) + divider(1) + status(1) + prompt
 	// Account for the pending tray when visible.
 	if n := len(m.queue); n > 0 {
 		const maxShown = 5
@@ -143,5 +143,41 @@ func (m *model) resizeViewport() {
 		m.ready = true
 	} else {
 		m.vp.Width, m.vp.Height = vpW, vpH
+	}
+}
+
+// maxPromptRows caps how tall the prompt grows before it scrolls internally.
+const maxPromptRows = 8
+
+// promptRows is how many terminal rows the prompt occupies: 1 for the approval
+// bar, else the textarea's current height (1..maxPromptRows).
+func (m *model) promptRows() int {
+	if m.pending != nil {
+		return 1
+	}
+	h := m.input.Height()
+	if h < 1 {
+		h = 1
+	}
+	return h
+}
+
+// syncPromptHeight grows/shrinks the input to fit its content (capped at
+// maxPromptRows), resizing the transcript viewport when the row count changes.
+// Called once per Update after the input has handled the message.
+func (m *model) syncPromptHeight() {
+	if m.pending != nil {
+		return // the approval bar replaces the prompt
+	}
+	want := m.input.LineCount()
+	if want < 1 {
+		want = 1
+	}
+	if want > maxPromptRows {
+		want = maxPromptRows
+	}
+	if want != m.input.Height() {
+		m.input.SetHeight(want)
+		m.resizeViewport()
 	}
 }

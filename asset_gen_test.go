@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/termenv"
 )
@@ -83,6 +84,9 @@ func genSplashScreen() string {
 func genPreviewScreen() string {
 	sp := spinner.New()
 	sp.Spinner = bbsSpinner("scan")
+	ta := textarea.New()
+	ta.SetWidth(88)
+	ta.SetHeight(1)
 	m := model{
 		mode: "ask", session: "a1b2c3d4", modelID: "sonnet",
 		// "theme" header shimmer ties the wordmark to the active palette (teal in
@@ -92,6 +96,7 @@ func genPreviewScreen() string {
 		ctxTokens:   24000, outTokens: 1200, ctxLimit: 200000,
 		busy: true, follow: true, ready: true,
 		sp:      sp,
+		input:   ta,
 		pending: &approvalReq{toolName: "Edit"},
 		w:       92,
 	}

@@ -30,7 +30,8 @@ subscription** because we never set an API key.
 - **Live status bar** — permission mode, session id, git branch, a context-pressure gauge that auto-grows 200K → 2M, output tokens, and running cost.
 - **Info sidebar** — `ctrl+g` / `/sidebar` toggles an at-a-glance BBS info rail; `/sidebar left|right` (or `/settings`) sets the side it docks to (default right).
 - **Bring your own tools** — point `-mcp` at a `.mcp.json` to wire extra MCP tools alongside the built-in approvals server.
-- **Prompt history & queueing** — `↑` / `↓` recalls past prompts; type while Claude is busy and messages queue, draining one per turn.
+- **Multi-line input** — Enter sends; insert a line break with `Alt+Enter`, `Ctrl+J`, or a trailing `\`. The prompt grows as you add lines (then scrolls).
+- **Prompt history & queueing** — `↑` / `↓` recalls past prompts (use `Ctrl+↑/↓` while composing a multi-line draft, where `↑/↓` move between lines); type while Claude is busy and messages queue, draining one per turn.
 
 ## Why this architecture (vs forking Crush/OpenCode)
 

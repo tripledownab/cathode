@@ -142,6 +142,13 @@ func (m model) handleKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 	// history, so it stays reachable in selection mode.
 	switch s := msg.String(); s {
 	case "up", "down", "ctrl+up", "ctrl+down":
+		ctrl := s == "ctrl+up" || s == "ctrl+down"
+		// In a multi-line draft, plain up/down move the cursor between lines (let
+		// the textarea handle them); history recall stays on ctrl+up/down and on a
+		// single-line prompt.
+		if !ctrl && m.input.LineCount() > 1 {
+			return m, nil, false
+		}
 		down := s == "down" || s == "ctrl+down"
 		if !m.mouse && (s == "up" || s == "down") {
 			if down {
@@ -224,6 +231,11 @@ func (m model) handleKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 	case tea.KeyEsc:
 		return m.handleEsc()
 	case tea.KeyEnter:
+		// alt+enter arrives as Enter with the Alt modifier — that's a newline, so
+		// let it fall through to the textarea instead of submitting.
+		if msg.Alt {
+			return m, nil, false
+		}
 		return m.handleEnter()
 	}
 	return m, nil, false
@@ -277,7 +289,15 @@ func (m model) handleEsc() (model, tea.Cmd, bool) {
 // handleEnter dispatches a non-empty submission: slash commands run in-process,
 // busy turns enqueue, otherwise we send to claude.
 func (m model) handleEnter() (model, tea.Cmd, bool) {
-	text := strings.TrimSpace(m.input.Value())
+	raw := m.input.Value()
+	// A trailing "\" turns Enter into a line break — portable multi-line entry
+	// without a modifier (alt+enter / ctrl+j also insert one).
+	if strings.HasSuffix(raw, "\\") {
+		m.input.SetValue(raw[:len(raw)-1] + "\n")
+		m.input.CursorEnd()
+		return m, nil, true
+	}
+	text := strings.TrimSpace(raw)
 	if text == "" {
 		return m, nil, false
 	}

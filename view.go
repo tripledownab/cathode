@@ -32,6 +32,8 @@ func (m model) View() string {
 // transcript body is the memoized frameBody (refreshed in Update); only the
 // animated banner and the cheap prompt/status are rebuilt every frame.
 func (m model) renderBackground() string {
+	// The approval bar replaces the prompt while a decision is pending; otherwise
+	// the (possibly multi-line) textarea.
 	prompt := m.input.View()
 	if m.pending != nil {
 		prompt = approveBar.Render(fmt.Sprintf(" ►◄ %s  %s    [ENTER] %s (default)    [ESC] %s ◄► ",

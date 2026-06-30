@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/charmbracelet/bubbles/spinner"
-	"github.com/charmbracelet/bubbles/textinput"
+	"github.com/charmbracelet/bubbles/textarea"
 )
 
 // Throwaway probe for the "scrolling lags after a long session" report: build a
@@ -15,8 +15,9 @@ import (
 // Whichever scales with N is the cost we leave running overnight.
 
 func benchModel(n int) model {
-	ti := textinput.New()
-	ti.Focus()
+	ta := textarea.New()
+	ta.SetHeight(1)
+	ta.Focus()
 	sp := spinner.New()
 	sp.Spinner = bbsSpinner("scan")
 	m := model{
@@ -24,7 +25,7 @@ func benchModel(n int) model {
 		headerStyle: headerTheme,
 		ctxTokens:   24000, outTokens: 1200, ctxLimit: 200000,
 		busy: false, follow: true, ready: true,
-		input: ti, sp: sp,
+		input: ta, sp: sp,
 		w: 100, h: 40,
 	}
 	m.vp = newTranscriptViewport(m.w-1, m.h-6)
