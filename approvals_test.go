@@ -47,7 +47,7 @@ func TestApprovalsHandshakeAndDecision(t *testing.T) {
 		if req.toolName != "Edit" {
 			t.Errorf("unexpected tool: %s", req.toolName)
 		}
-		req.reply <- true
+		req.reply <- approvalReply{allow: true}
 	}()
 
 	done := make(chan map[string]any, 1)

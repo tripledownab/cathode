@@ -81,6 +81,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.handleEvent(msg.env)
 
 	case pendingApprovalMsg:
+		// AskUserQuestion is a question, not a permission. Always present it — even
+		// in build/bypass, and never auto-approve — and answer it via the picker
+		// (see question.go / keys.go); the reply carries the chosen answer.
+		if q, ok := parseAskQuestion(msg.req); ok {
+			m.question = q
+			m.picker = q.picker(m.w, m.h)
+			return m, nil // approvals waiter re-armed when the question is answered
+		}
 		// Surface what's being approved either way (so AUTO mode still shows
 		// a transcript record of what ran).
 		if ds, ok := diffsForTool(msg.req.toolName, msg.req.input); ok {
@@ -92,7 +100,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// instead of stalling on a y/n bar. acceptEdits alone only handles
 		// file edits; this extends it to bash, grep, fetch, etc.
 		if m.mode == "build" {
-			msg.req.reply <- true
+			msg.req.reply <- approvalReply{allow: true}
 			m.add(entInfo, "✓ auto-approved "+msg.req.toolName)
 			m.refreshBody() // early return — keep the cached body current
 			return m, waitApproval(m.approvals)

@@ -16,7 +16,7 @@ func driveApproval(t *testing.T, key tea.KeyMsg) bool {
 	// newModel sets splash=true; the splash eats the first keypress, which
 	// would defeat the test. Skip past it.
 	m.splash = false
-	reply := make(chan bool, 1)
+	reply := make(chan approvalReply, 1)
 	m.pending = &approvalReq{
 		toolName: "Edit",
 		input:    json.RawMessage(`{}`),
@@ -25,7 +25,7 @@ func driveApproval(t *testing.T, key tea.KeyMsg) bool {
 	_, _ = m.Update(key)
 	select {
 	case v := <-reply:
-		return v
+		return v.allow
 	case <-time.After(500 * time.Millisecond):
 		t.Fatal("approval handler never replied")
 		return false

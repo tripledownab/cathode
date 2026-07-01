@@ -80,6 +80,11 @@ func (m *model) handleEvent(e Envelope) {
 				if b.ID != "" {
 					m.toolUses[b.ID] = b.Name
 				}
+				// AskUserQuestion is surfaced and answered through the approval
+				// question picker (see question.go), so skip its raw tool card.
+				if b.Name == askUserQuestionTool {
+					continue
+				}
 				if ds, ok := diffsForTool(b.Name, b.Input); ok {
 					m.addDiffs(ds)
 				} else {
@@ -99,6 +104,12 @@ func (m *model) handleEvent(e Envelope) {
 				continue
 			}
 			name := m.toolUses[b.ToolUseID]
+			// The AskUserQuestion result is our own deny-message (the injected
+			// answer) coming back as an error — we already logged the answer via
+			// the picker, so don't surface it as a failed tool.
+			if name == askUserQuestionTool {
+				continue
+			}
 			body := flattenToolResult(b.Content)
 			m.addToolResult(name, body, b.IsError)
 		}

@@ -37,6 +37,7 @@ Key subtleties:
 - The handler answers a POST as either plain JSON or an SSE `message` event, chosen from the request's `Accept` header. Some clients (including current `claude`) advertise `text/event-stream` and need the SSE framing. Both paths are unit-tested.
 - The approval flow only fires for tools that no static allow/deny rule already settled. Do not pass `--allowedTools Edit,Write,MultiEdit` if you want those to surface in the approval pane.
 - `bypass` mode skips starting the server entirely (nothing is gated, nothing to approve).
+- `AskUserQuestion` also arrives through this approve tool (not a permission — a question). `question.go` intercepts it, shows the options as a picker, and returns the chosen answer as the *deny message* — the only channel the headless CLI gives us (the tool itself errors in `-p` mode). Claude reads that message as the answer. This is why the reply channel carries an `approvalReply{allow, message}` rather than a bare bool, and why the question is presented even in `build`/`bypass` (never auto-approved).
 - If the spec surface needs to grow (GET SSE channel, `Mcp-Session-Id` round-tripping, etc.), `approvals.go:handle` is the single extension point.
 
 ### Diff rendering (`diff.go`)

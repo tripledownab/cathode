@@ -61,15 +61,16 @@ type model struct {
 	hist      *history
 	sessions  *sessionStore
 
-	pending     *approvalReq // non-nil while awaiting a y/n decision
-	picker      *picker      // non-nil while a picker dialog is open
-	splash      bool         // true until the first keypress dismisses the boot screen
-	splashFrame int          // current animation frame; clamps at splashFinalFrame
-	logoIdx     int          // which splash wordmark variant this launch shows (picked once)
-	colorPhase  int          // monotonic counter driving the header wordmark's rainbow sweep
-	sidebar     bool         // true to render the BBS info rail (auto-hidden on narrow terms)
-	help        bool         // true while the help modal is up; Esc dismisses
-	mouse       bool         // mouse capture on (wheel scroll) vs off (terminal-native select/copy)
+	pending     *approvalReq     // non-nil while awaiting a y/n decision
+	question    *pendingQuestion // non-nil while answering an AskUserQuestion
+	picker      *picker          // non-nil while a picker dialog is open
+	splash      bool             // true until the first keypress dismisses the boot screen
+	splashFrame int              // current animation frame; clamps at splashFinalFrame
+	logoIdx     int              // which splash wordmark variant this launch shows (picked once)
+	colorPhase  int              // monotonic counter driving the header wordmark's rainbow sweep
+	sidebar     bool             // true to render the BBS info rail (auto-hidden on narrow terms)
+	help        bool             // true while the help modal is up; Esc dismisses
+	mouse       bool             // mouse capture on (wheel scroll) vs off (terminal-native select/copy)
 
 	settings    settings // persisted user config (see settings.go)
 	headerStyle string   // live header animation id; previewed in /settings, committed to settings.Header

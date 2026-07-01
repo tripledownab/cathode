@@ -32,7 +32,16 @@ type Approvals struct {
 type approvalReq struct {
 	toolName string
 	input    json.RawMessage
-	reply    chan bool // true = allow, false = deny
+	reply    chan approvalReply
+}
+
+// approvalReply is the TUI's answer to an approvalReq. allow runs the tool;
+// otherwise it's denied and message becomes the denial text Claude sees — which
+// for the AskUserQuestion tool we repurpose to carry the user's chosen answer
+// (the only channel the headless CLI gives us to feed a question's result back).
+type approvalReply struct {
+	allow   bool
+	message string
 }
 
 const (
@@ -203,19 +212,24 @@ func (a *Approvals) callTool(params json.RawMessage) map[string]any {
 	}
 	_ = json.Unmarshal(params, &p)
 
-	reply := make(chan bool, 1)
+	reply := make(chan approvalReply, 1)
 	a.pending <- approvalReq{toolName: p.Arguments.ToolName, input: p.Arguments.Input, reply: reply}
-	allow := <-reply
+	d := <-reply
 
 	var decision string
-	if allow {
+	if d.allow {
 		inp := string(p.Arguments.Input)
 		if inp == "" {
 			inp = "{}"
 		}
 		decision = fmt.Sprintf(`{"behavior":"allow","updatedInput":%s}`, inp)
 	} else {
-		decision = `{"behavior":"deny","message":"Denied by user in ccharness"}`
+		msg := d.message
+		if msg == "" {
+			msg = "Denied by user in ccharness"
+		}
+		mb, _ := json.Marshal(msg)
+		decision = fmt.Sprintf(`{"behavior":"deny","message":%s}`, mb)
 	}
 	return map[string]any{
 		"content": []any{map[string]any{"type": "text", "text": decision}},

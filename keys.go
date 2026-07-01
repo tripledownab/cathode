@@ -81,6 +81,16 @@ func (m model) handleKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 				m.commitSidebarPos(chosen)
 			}
 			return m, nil, true
+		case "question":
+			// Answering an AskUserQuestion: a pick records the answer (and may open
+			// the next question); Esc (picker closed, no pick) dismisses it.
+			switch {
+			case chosen != "":
+				return m, m.answerQuestion(chosen), true
+			case m.picker == nil:
+				return m, m.cancelQuestion(), true
+			}
+			return m, nil, true
 		}
 		if chosen == "" {
 			return m, nil, true
@@ -246,19 +256,53 @@ func (m model) handleKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 func (m model) handleApprovalKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 	switch msg.String() {
 	case "esc":
-		m.pending.reply <- false
+		m.pending.reply <- approvalReply{allow: false}
 		m.add(entInfo, "✗ denied "+m.pending.toolName)
 		m.pending = nil
 		return m, waitApproval(m.approvals), true
 	case "ctrl+c":
-		m.pending.reply <- false
+		m.pending.reply <- approvalReply{allow: false}
 		return m, tea.Quit, true
 	default:
-		m.pending.reply <- true
+		m.pending.reply <- approvalReply{allow: true}
 		m.add(entInfo, "✓ approved "+m.pending.toolName)
 		m.pending = nil
 		return m, waitApproval(m.approvals), true
 	}
+}
+
+// answerQuestion records the chosen label for the current AskUserQuestion, then
+// advances to the next question or — once all are answered — replies to claude
+// with the combined answer (via the permission deny-message) and re-arms the
+// approvals waiter.
+func (m *model) answerQuestion(label string) tea.Cmd {
+	q := m.question
+	if q == nil {
+		return nil
+	}
+	q.answers = append(q.answers, label)
+	q.idx++
+	if q.idx < len(q.questions) {
+		m.picker = q.picker(m.w, m.h)
+		return nil
+	}
+	q.req.reply <- approvalReply{message: q.answerMessage()}
+	m.add(entInfo, "✓ "+q.summary())
+	m.question = nil
+	return waitApproval(m.approvals)
+}
+
+// cancelQuestion dismisses the question (Esc): claude is told it went
+// unanswered, and the waiter is re-armed.
+func (m *model) cancelQuestion() tea.Cmd {
+	q := m.question
+	if q == nil {
+		return nil
+	}
+	q.req.reply <- approvalReply{message: "The user dismissed the question without answering."}
+	m.add(entInfo, "✗ dismissed question")
+	m.question = nil
+	return waitApproval(m.approvals)
 }
 
 // handleEsc cascades: clear queue → interrupt in-flight → quit. So a stray

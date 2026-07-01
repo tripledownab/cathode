@@ -36,13 +36,13 @@ func TestQuitPathsDoNotTouchEngine(t *testing.T) {
 	}
 
 	// ctrl+c during a pending approval: denies (buffered reply) then quits
-	pending := &approvalReq{toolName: "Edit", reply: make(chan bool, 1)}
+	pending := &approvalReq{toolName: "Edit", reply: make(chan approvalReply, 1)}
 	m := model{pending: pending}
 	_, cmd, handled := m.handleKey(tea.KeyMsg{Type: tea.KeyCtrlC})
 	if !handled || !isQuit(cmd) {
 		t.Error("ctrl+c during approval should quit")
 	}
-	if got := <-pending.reply; got {
+	if (<-pending.reply).allow {
 		t.Error("ctrl+c during approval should deny the pending request")
 	}
 }

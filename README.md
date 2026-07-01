@@ -20,6 +20,7 @@ subscription** because we never set an API key.
 - **Rides your Pro/Max subscription** — drives the real `claude` CLI as a subprocess and scrubs `ANTHROPIC_API_KEY` / `ANTHROPIC_AUTH_TOKEN` from its env, so it never silently falls back to API billing.
 - **Four permission modes** — `plan`, `ask`, `build` (auto-accept edits), `bypass`; cycle with `shift+tab` or `/mode`.
 - **Inline approvals** — in `ask` mode every gated tool call raises a `[ENTER] allow · [ESC] deny` bar (served by a hand-rolled in-process MCP permission server); edits show the diff before you decide.
+- **Answers Claude's questions** — when Claude asks (its `AskUserQuestion` tool), the options pop up as a picker to choose from — always presented (never auto-approved, even in `build`/`bypass`), so a question actually waits for your answer instead of erroring out.
 - **Visual diff cards** — `Edit` / `Write` / `MultiEdit` render as line-numbered red/green diffs instead of raw JSON, unified or side-by-side **split** (`/diff` or `/settings`).
 - **Markdown replies** — Claude's output is rendered with Glamour and reflows on resize.
 - **Clickable links** — `http(s)` URLs in the transcript are wrapped as OSC 8 terminal hyperlinks (Cmd/Ctrl-click, or a plain click with `/mouse` off).
