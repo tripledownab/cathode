@@ -3,7 +3,8 @@
 *A personal, BBS-styled terminal harness for Claude — running on your Max plan.*
 
 > The binary is `cathode`, the Go module is `ccharness`, and the wordmark renders
-> as `cath0d3` (`appName` in `theme.go`). The repo directory is still `doorway`.
+> as `cath0d3` (`appName` in `theme.go`). The repo lives at
+> `github.com/tripledownab/cathode` (it began life as `doorway`).
 
 ## What it is
 
@@ -13,9 +14,11 @@ custom TUI with a 90s bulletin-board aesthetic. It is built for one user (you),
 on a Mac and on Ubuntu, and it bills against your Claude Max subscription rather
 than the pay-per-token API.
 
-The name is a deliberate nod: on a BBS, a *door* was an external program the
-board shelled out to — door games and the like. Cathode does exactly that with
-the `claude` binary. The harness is the board; Claude is the door.
+The design carries a deliberate BBS nod: on a board, a *door* was an external
+program the BBS shelled out to — door games and the like. This does exactly
+that with the `claude` binary (the harness is the board; Claude is the door),
+which is why the project was first called *Doorway*. *Cathode* keeps the same
+era's glow — the CRT the whole aesthetic is drawn on.
 
 ## The constraint that shaped everything
 
@@ -60,10 +63,12 @@ turns to its stdin as NDJSON and read a stream of events back from its stdout.
 The subprocess environment is scrubbed of `ANTHROPIC_API_KEY` and
 `ANTHROPIC_AUTH_TOKEN` so nothing silently overrides the subscription.
 
-The **UI** (`ui.go`) is a Bubble Tea program. A reader goroutine parses each
-stdout event and forwards it into the update loop; the model turns events into
-transcript entries and paints them. This is where the whole custom experience
-lives — we own every pixel and none of the agent logic.
+The **UI** is a Bubble Tea program, split into small single-concern files
+(`model.go`, `update.go`, `view.go`, `keys.go`, `stream.go`, `render.go`, …). A
+reader goroutine parses each stdout event and forwards it into the update loop;
+the model turns events into transcript entries and paints them. This is where
+the whole custom experience lives — we own every pixel and none of the agent
+logic.
 
 Permission handling is the interesting bit. In headless mode there is no
 interactive prompt, so to approve actions inline we run a tiny **MCP server**
@@ -76,15 +81,20 @@ from the client's `Accept` header.
 
 ## The pieces
 
+The core pieces (the full per-file map lives in the README):
+
 | file           | role                                                              |
 |----------------|-------------------------------------------------------------------|
 | `engine.go`    | subprocess lifecycle, env scrub, NDJSON in/out                    |
 | `events.go`    | tolerant parser for the stream-json event envelope                |
-| `ui.go`        | the Bubble Tea model — transcript, input, event handling          |
-| `diff.go`      | edit-tool detection + the line-numbered red/green diff card       |
+| `stream.go`    | routes each parsed event into the model                           |
+| `model.go` `update.go` `view.go` `keys.go` | the Bubble Tea loop — state, dispatch, paint, keys |
+| `render.go`    | entries → viewport, with a per-entry render cache                 |
+| `diff.go` `diff_split.go` | edit-tool detection + the unified / side-by-side diff cards |
 | `approvals.go` | in-process MCP permission server (JSON + SSE)                     |
-| `theme.go`     | the 90s BBS / ANSI-art theme — palette, boxes, banner, status     |
-| `main.go`      | flags, and the wiring that ties the three layers together         |
+| `question.go`  | answers Claude's `AskUserQuestion` through a picker               |
+| `theme.go`     | palettes (11 themes), boxes, banner, status                       |
+| `main.go`      | flags, and the wiring that ties the layers together               |
 
 No heavy dependencies: Bubble Tea, Glamour, and `go-udiff` for the view; the
 approvals server is pure standard library.
@@ -92,20 +102,28 @@ approvals server is pure standard library.
 ## What it does today
 
 Claude's replies render as proper markdown through Glamour, so code blocks and
-lists read correctly. File edits (`Edit`/`Write`/`MultiEdit`) become a diff
-card — filename, change counts, an old/new line-number gutter, and red/green
-hunks — re-rendered to width on resize. Three modes map to Claude's permission
-posture: `plan` previews without touching files, `build` auto-accepts edits, and
-`ask` routes every gated action through the inline approval pane. Your internal
-tools attach as MCP servers via a `.mcp.json` and show up with no UI changes.
+lists read correctly; URLs come out as clickable OSC 8 hyperlinks, and extended
+thinking shows dim above the reply. File edits (`Edit`/`Write`/`MultiEdit`)
+become a diff card — filename, change counts, an old/new line-number gutter,
+red/green hunks, unified or side-by-side — re-rendered to width on resize. Four
+modes map to Claude's permission posture: `plan` previews without touching
+files, `build` auto-accepts, `bypass` gates nothing, and `ask` routes every
+gated action through the inline approval pane. When Claude *asks* something
+(its `AskUserQuestion` tool), the options pop up as a picker and your choice
+flows back — in every mode. Sessions resume via `ctrl+r`, the prompt takes
+multi-line input, slash commands we don't own are forwarded to `claude` (so
+skills and plugin commands work), and your internal tools attach as MCP servers
+via a `.mcp.json` with no UI changes.
 
 ## The look
 
 Authentic BBS: base-16 ANSI neon on black, CP437 double-line borders, `░▒▓█`
 gradient flourishes on the wordmark, a magenta lightbar for approvals, and a
-DOS-style status line reading `ALT-X EXIT │ MODE │ BAUD MAX │ NODE │ $cost`. The
-entire look is nine palette constants at the top of `theme.go`; swap them for a
-Turbo-Vision blue scheme or anything else without touching another file.
+DOS-style status line reading `MDL │ MODE │ NODE │ BR │ CTX-gauge │ OUT │ $cost`
+with a `READY`/`WORKING` state pinned right. The entire look is one palette row
+(ten colors) in `theme.go` — eleven ship built in (Dracula, Nord, Catppuccin
+Mocha, …), switched live with `/theme` and persisted, without touching another
+file.
 
 ## Running it
 
@@ -120,22 +138,27 @@ shows the subscription route rather than API credits.
 
 ## Honest edges
 
-The harness has not yet been driven by the real `claude` binary end to end — the
-sandbox it was built in didn't have it installed. The most likely place for a
-first-run hiccup is the MCP handshake in `approvals.go`; the JSON-RPC and both
-transports are unit-tested, but a stricter real client might want more of the
-Streamable-HTTP spec (a GET SSE channel, session-id round-tripping), and that
-function is the one spot to extend.
+The harness is in daily use against the real `claude` binary now; the original
+worry — the MCP handshake in `approvals.go` — turned out to need exactly one
+accommodation (the client advertises `text/event-stream`, so the handler speaks
+SSE framing as well as plain JSON; both are unit-tested). If a future client
+wants more of the Streamable-HTTP spec (a GET SSE channel, session-id
+round-tripping), that handler is still the one spot to extend.
 
 Two protocol details are under-documented and worth knowing: the stdin user-turn
 envelope matches the Agent SDK's streaming-input format, and the
 permission-prompt-tool contract (`tool_name` + `input` in, `{"behavior":...}`
-out) is the de-facto one. Both are flagged in the code.
+out) is the de-facto one. Both are flagged in the code. A third rides on the
+second: answering Claude's questions works by returning the user's choice as the
+permission *deny message* — the only response channel the headless CLI exposes —
+which Claude then reads as the answer.
 
 ## What's next
 
 Live token-by-token streaming (it trades off against markdown, so it wants a
 "plain while streaming, re-render on block-stop" pass); syntax-token
-highlighting inside the diff (Glamour already pulls in a highlighter); and a
-Glamour theme tuned to the BBS palette so Claude's markdown stops clashing with
-the chrome. None are load-bearing — the core harness is complete.
+highlighting inside the diff (Glamour already pulls in a highlighter); a Glamour
+theme tuned to the active palette so Claude's markdown stops clashing with the
+chrome; and multi-select / free-text answers for Claude's questions
+(single-select works today). None are load-bearing — the core harness is
+complete.

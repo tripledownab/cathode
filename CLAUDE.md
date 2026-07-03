@@ -19,11 +19,11 @@ Running the app requires the `claude` CLI on PATH with `claude login` already co
 
 Cathode is a Bubble Tea TUI that drives the `claude` CLI as a long-lived subprocess over its bidirectional stream-json protocol. The agent loop, context, tools, and auth all live inside `claude`; this program owns only the terminal UI and the stdin/stdout plumbing. That split is the reason the binary is small and the reason it can ride a Max subscription instead of an API key.
 
-Process flow (`main.go` → `engine.go` → `ui.go`):
+Process flow (`main.go` → `engine.go` → the UI loop, which is split across `model.go` / `update.go` / `view.go` / `keys.go` / `stream.go` / `render.go`):
 
-1. `main.go` parses flags, optionally starts the in-process approvals MCP server, then `NewEngine` spawns `claude -p --input-format stream-json --output-format stream-json --verbose ...`. `--verbose` is mandatory — without it print mode emits only the final result, not the event stream.
-2. `Engine.Pipe` runs in a goroutine, scanning stdout NDJSON and forwarding each parsed `Envelope` (`events.go`) to the Bubble Tea program via `p.Send`. The Update loop dispatches on envelope `Type` (`system` / `assistant` / `result`) in `ui.go:handleEvent`.
-3. `Engine.Send` writes one user turn per Enter as an `outUser` NDJSON envelope. This envelope shape is the under-documented half of the protocol — it matches the Agent SDK streaming-input format. If a future `claude` rejects it, check the Agent SDK streaming docs, not the stream-json output docs.
+1. `main.go` parses flags, optionally starts the in-process approvals MCP server, then `NewEngine` spawns `claude -p --input-format stream-json --output-format stream-json --verbose ...`. `--verbose` is mandatory — without it print mode emits only the final result, not the event stream. After `p.Run()` returns, `main` closes the subprocess — never do that from the Update loop (`Engine.Close` blocks on `Wait()` and deadlocks against the `Pipe` goroutine; that was the one-ctrl+c freeze).
+2. `Engine.Pipe` runs in a goroutine, scanning stdout NDJSON and forwarding each parsed `Envelope` (`events.go`) to the Bubble Tea program via `p.Send`. The Update loop dispatches on envelope `Type` (`system` / `assistant` / `user` / `result` / `control_response`) in `stream.go:handleEvent`.
+3. `Engine.Send` writes one user turn per Enter as an `outUser` NDJSON envelope. This envelope shape is the under-documented half of the protocol — it matches the Agent SDK streaming-input format. If a future `claude` rejects it, check the Agent SDK streaming docs, not the stream-json output docs. Slash commands we don't own are forwarded to `claude` the same way (that's how skills and plugin commands run).
 
 ### Subscription billing — load-bearing constraint
 
@@ -40,17 +40,17 @@ Key subtleties:
 - `AskUserQuestion` also arrives through this approve tool (not a permission — a question). `question.go` intercepts it, shows the options as a picker, and returns the chosen answer as the *deny message* — the only channel the headless CLI gives us (the tool itself errors in `-p` mode). Claude reads that message as the answer. This is why the reply channel carries an `approvalReply{allow, message}` rather than a bare bool, and why the question is presented even in `build`/`bypass` (never auto-approved).
 - If the spec surface needs to grow (GET SSE channel, `Mcp-Session-Id` round-tripping, etc.), `approvals.go:handle` is the single extension point.
 
-### Diff rendering (`diff.go`)
+### Diff rendering (`diff.go`, `diff_split.go`)
 
-`diffsForTool` recognises `Edit`, `Write`, and `MultiEdit` tool_use blocks and turns them into one-or-more `fileDiff{file, old, new}` pairs. `Write` reads the current file off disk for the "before" — this works because `claude` runs in the TUI's cwd. Anything else falls back to a plain tool card in `ui.go`. Diff cards are re-rendered on every `rebuild()` so they reflow on resize.
+`diffsForTool` recognises `Edit`, `Write`, and `MultiEdit` tool_use blocks and turns them into one-or-more `fileDiff{file, old, new}` pairs. `Write` reads the current file off disk for the "before" — this works because `claude` runs in the TUI's cwd. Anything else falls back to a typed tool card (`tools.go`) or the plain card in `render.go`. `renderDiffFor` dispatches on the persisted diff style: unified (`diff.go`) or side-by-side split (`diff_split.go`, falls back to unified under 80 cols).
 
-### UI rebuild model (`ui.go`)
+### UI rebuild model (`render.go`)
 
-The transcript is stored as a `[]entry` of raw text/data, not pre-rendered strings. `rebuild()` re-renders every entry into the viewport on each new entry and on resize, which is what lets markdown (Glamour) and diff cards reflow to a new width. If you add a new entry kind, add a case to `rebuild()` and remember the resize implications.
+The transcript is stored as a `[]entry` of raw text/data, not pre-rendered strings. `rebuild()` renders each entry **once** into a retained buffer (per-entry cache keyed by wrap width) — the common case appends only the new tail, which is what keeps long sessions O(new) per message instead of the old O(n²). A full re-render happens only when the width changes or entries were removed; anything else that changes how existing entries render (theme swap, diff-style toggle) must go through `rerender()`, which drops the cache first. The composed frame body (viewport + scrollbar + sidebar) is additionally memoized per `bodyKey` (`view.go:refreshBody`), so typing and header animation don't re-style the transcript. If you add a new entry kind, add a case to `renderEntry()`; if you add a rendering-relevant setting, key `bodyKey` on it and route its commit through `rerender()`.
 
 ### Theme discipline (`theme.go`, `splash.go`)
 
-The BBS look (leet/studly/ornament/scene-divider helpers) is applied to chrome only — banner, dividers, status, labels, splash. Claude's replies and the diff body stay plain and readable. Don't sprinkle `leet()`/`studly()` into transcript content. Reskin by swapping the nine palette constants in `theme.go`; the wordmark is `appName` in `theme.go` (rendered `cath0d3`), and the splash shows a random pick from `logoVariants` in `logos.go` (regenerate a row with `figlet -f <font> -w 200 "cath0d3" | tr '\140' "'"`).
+The BBS look (leet/studly/ornament/scene-divider helpers) is applied to chrome only — banner, dividers, status, labels, splash. Claude's replies and the diff body stay plain and readable. Don't sprinkle `leet()`/`studly()` into transcript content. Theming is the `palettes` map in `theme.go` (11 built-in themes, ten colors each, switched live via `/theme` and persisted); add a theme by adding a palette row + a `themes` entry — every style rebuilds from the active palette in `buildStyles`. The wordmark is `appName` in `theme.go` (rendered `cath0d3`), and the splash shows a random pick from `logoVariants` in `logos.go` (regenerate a row with `figlet -f <font> -w 200 "cath0d3" | tr '\140' "'"`). The marketing SVGs and per-theme shots in `assets/` regenerate from live UI code via `CATHODE_GENASSETS=1 go test -run 'TestGenerateAssets|TestGenerateThemeAssets'` — regenerate them whenever chrome the preview shows (status bar, banner, diff card) changes.
 
 ## Flags worth knowing
 
@@ -58,3 +58,6 @@ The BBS look (leet/studly/ornament/scene-divider helpers) is applied to chrome o
 - `-mcp <path>` → passed through as a second `--mcp-config` alongside the approvals one; both flags compose
 - `-model <name>` → empty string means "let the account default win"
 - `-spinner bar|shade|block|arrow|scan` → animated throbber frames in the status bar
+- `-resume <session-id>` → resume a claude session; also set automatically when the user picks one via `ctrl+r` (main re-execs itself with it)
+- `-ctx 200k|500k|1m|<n>` → the context-pressure gauge's window; auto-grows past the observed input
+- `-debug <file>` → tee raw stream-json + MCP traffic to a logfile — the first thing to reach for on protocol issues

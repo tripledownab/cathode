@@ -79,6 +79,9 @@ make clean      # remove ./cathode
 | `-mcp`   | `""`    | path to a `.mcp.json` that wires your internal tools                      |
 | `-model` | `""`    | pin a model (e.g. `sonnet`); empty uses the account default               |
 | `-spinner`| `bar`  | working throbber: `bar` | `shade` | `block` | `arrow` | `scan`           |
+| `-resume`| `""`    | claude session id to resume (set automatically when picking via `ctrl+r`) |
+| `-ctx`   | `200k`  | context-gauge window: `200k` / `500k` / `1m` or a raw count; auto-grows   |
+| `-debug` | `""`    | tee raw stream-json + MCP traffic to this logfile                         |
 
 ## Themes
 
@@ -125,7 +128,8 @@ Small files by responsibility (the project keeps each one scannable).
 | `view.go` | `View` + `renderBackground` (chrome + transcript + prompt + status) |
 | `keys.go` | keyboard dispatch |
 | `scroll.go` | the transcript viewport + scroll / auto-follow |
-| `render.go` | `rebuild` / `renderEntry` — entries → viewport |
+| `render.go` | `rebuild` / `renderEntry` — entries → viewport (per-entry render cache) |
+| `linkify.go` | wraps URLs in OSC 8 hyperlinks so they're clickable |
 | `diff.go` | edit-tool detection + the unified line-numbered red/green diff card |
 | `diff_split.go` | the side-by-side (split) diff card + the diff-style setting |
 | `tools.go` | typed tool-call / tool-result cards |
@@ -151,8 +155,9 @@ Small files by responsibility (the project keeps each one scannable).
 | `picker.go` | the fuzzy filter-and-pick modal (sessions / commands / theme / fps) + scrollbar |
 | `overlay.go` | ANSI-aware splice that floats a modal over the transcript |
 | `commands.go` | the slash-command table + help modal |
-| `settings.go` | persisted settings (header / theme / fps) + their pickers |
+| `settings.go` | persisted settings (header / theme / fps / diff / sidebar) + their pickers |
 | `approvals.go` | the in-process MCP permission server (`--permission-prompt-tool`) |
+| `question.go` | intercepts Claude's `AskUserQuestion` and answers it via a picker |
 
 **State & persistence**
 
@@ -177,8 +182,9 @@ splash (`splash.go`) opens with the wordmark, a faux modem handshake, and a
 Discipline: the leet/studly/ornament treatment runs on *chrome only* — banner,
 dividers, status, labels, splash. Claude's replies and the diff code stay
 plain and readable. The `leet`, `studly`, `flavor`, and `sceneDivider` helpers
-live in `theme.go`; reskin by swapping the nine palette constants. The wordmark
-is the `appName` constant.
+live in `text.go`; reskin by adding or editing a palette row (ten colors) in
+`theme.go` — that's how all 11 built-in themes are defined (see
+[Themes](#themes)). The wordmark is the `appName` constant.
 
 The splash shows one of several wide block logos at random each launch
 (`logoVariants` in `logos.go`), generated offline with figlet. Add or swap a
@@ -192,17 +198,19 @@ status bar; choose its frames with `-spinner` (the `shade` pulse `░▒▓█` 
 ## Done vs next
 
 Done: markdown rendering (Glamour), bordered message cards, plan/build/ask
-modes, MCP tool-wiring hook, and an OpenCode-style visual diff card for
-`Edit`/`Write`/`MultiEdit` tool calls (filename + counts, old/new line-number
-gutter, red/green hunks), and an inline permission/approval pane: in `ask`
-mode Claude routes each gated tool through our in-process MCP server, the TUI
-shows the proposed change (diff for edits) and a `[y] allow / [n] deny` bar, and
-the decision is returned to Claude.
+modes, MCP tool-wiring hook, visual diff cards for `Edit`/`Write`/`MultiEdit`
+(unified and side-by-side split), the inline permission/approval pane (in `ask`
+mode each gated tool routes through our in-process MCP server and raises an
+`[ENTER] allow / [ESC] deny` bar, diffs shown first), Claude's questions
+answered via a picker, multi-line input, session resume, 11 themes, extended
+thinking, clickable links, slash-command forwarding (skills & plugins), and the
+merged command palette.
 
 Next / deferred: (a) token-by-token streaming via `--include-partial-messages` (trades
 off against markdown); (b) syntax-token highlighting inside the diff — chroma is
 already in the tree via glamour, so per-line token coloring on top of the red/
-green background is a natural follow-on.
+green background is a natural follow-on; (c) multi-select and free-text "Other"
+answers for Claude's questions (single-select works today).
 
 ## Known sharp edges
 
