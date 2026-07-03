@@ -5,13 +5,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build / test
 
 ```bash
-go mod tidy            # first-time: fetches deps and writes go.sum
+go mod download        # first-time: fetch deps (go.sum is checked in)
 make build             # -> ./cathode
 make test              # go test ./...
 go test -run TestApprovalsSSEFraming ./...   # single test
 ```
 
-`go.sum` is intentionally absent from the repo — `go mod tidy` regenerates it locally against the canonical module proxy. The Go module is named `ccharness` and the repo directory is `cathode`, with the binary also `cathode` (set by `APP` in the Makefile) and the wordmark rendering as `cath0d3` (`appName` in `theme.go`); keep BUILD.md and README in sync when renaming. (The repo dir was renamed from `doorway`; because `claude` partitions its per-project session JSONLs by cwd slug under `~/.claude/projects/-<abs-path>`, a repo-path rename also requires moving that slug dir — else prior sessions stop surfacing in the resume picker.) The persisted state dir is `$XDG_STATE_HOME/cathode` (resolved in `state.go`); a one-time `migrateLegacyState` renames an old `$XDG_STATE_HOME/doorway` dir into it on first run so existing sessions/history/settings survive. All three stores (`sessions.go`, `history.go`, `settings.go`) go through `stateFilePath`/`stateDir` — don't re-derive the path inline, and change the dir name only with a matching migration.
+`go.sum` is checked in; run `go mod tidy` after changing dependencies to refresh it. The Go module is named `ccharness` and the repo directory is `cathode`, with the binary also `cathode` (set by `APP` in the Makefile) and the wordmark rendering as `cath0d3` (`appName` in `theme.go`); keep BUILD.md and README in sync when renaming. (The repo dir was renamed from `doorway`; because `claude` partitions its per-project session JSONLs by cwd slug under `~/.claude/projects/-<abs-path>`, a repo-path rename also requires moving that slug dir — else prior sessions stop surfacing in the resume picker.) The persisted state dir is `$XDG_STATE_HOME/cathode` (resolved in `state.go`); a one-time `migrateLegacyState` renames an old `$XDG_STATE_HOME/doorway` dir into it on first run so existing sessions/history/settings survive. All three stores (`sessions.go`, `history.go`, `settings.go`) go through `stateFilePath`/`stateDir` — don't re-derive the path inline, and change the dir name only with a matching migration.
 
 Running the app requires the `claude` CLI on PATH with `claude login` already completed (Pro/Max account). Verify with `claude` + `/status` showing the subscription route — anything else means you'll bill the API.
 

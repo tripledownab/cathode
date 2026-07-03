@@ -129,7 +129,7 @@ file.
 
 ```bash
 claude login        # once, with Pro/Max credentials only
-go mod tidy
+go mod download
 go run . -mode ask
 ```
 

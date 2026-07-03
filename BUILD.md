@@ -5,7 +5,7 @@ account: `claude login`).
 
 ```bash
 cd cathode
-go mod tidy        # fetches deps + writes go.sum (needs network the first time)
+go mod download    # fetches deps (needs network the first time)
 make build         # -> ./cathode     (or: go build -o cathode .)
 ./cathode
 ```
@@ -18,6 +18,5 @@ Flags: `-mode ask|plan|build|bypass`, `-spinner bar|shade|block|arrow|scan`,
 `-mcp <path-to-.mcp.json>`, `-model <name>`, `-resume <session-id>`,
 `-ctx 200k|500k|1m|<n>`, `-debug <logfile>`.
 
-Note: the shipped `go.mod` has no `go.sum` on purpose — `go mod tidy` generates
-it against the canonical module proxy on your machine. Confirm `/status` in
-`claude` shows the subscription route before relying on Max billing.
+Note: confirm `/status` in `claude` shows the subscription route before
+relying on Max billing.

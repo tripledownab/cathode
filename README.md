@@ -46,7 +46,7 @@ cards, plan/build modes — not their engine.
 
 ```bash
 claude login            # one-time, with your Pro/Max credentials only
-go mod tidy             # fills indirect deps + go.sum via the normal proxy
+go mod download         # fetch deps (go.sum is checked in)
 go run .                # AUTO (build) by default; -mode ask | plan | bypass to switch
 ```
 
@@ -61,7 +61,7 @@ subscription route (not API credits) before relying on this.
 make build      # compile ./cathode
 make run        # build, then launch in ask mode
 make test       # go test ./...
-make tidy       # go mod tidy (writes go.sum)
+make tidy       # go mod tidy (refresh go.sum after dep changes)
 make install    # build + copy to ~/.local/bin  (override: make install PREFIX=/usr/local/bin)
 make uninstall  # remove the installed binary
 make reinstall  # clean + install
