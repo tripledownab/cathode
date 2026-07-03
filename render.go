@@ -1,6 +1,10 @@
 package main
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/rivo/uniseg"
+)
 
 // rebuild writes the rendered transcript into the viewport. Each entry is
 // rendered once and appended to m.content (a retained buffer), so the common
@@ -162,17 +166,16 @@ func (m *model) promptRows() int {
 	return h
 }
 
-// syncPromptHeight grows/shrinks the input to fit its content (capped at
-// maxPromptRows), resizing the transcript viewport when the row count changes.
+// syncPromptHeight grows/shrinks the input to fit its content — hard line
+// breaks AND soft-wrapped rows (promptwrap.go), so a long line in a narrow
+// window stays fully visible instead of scrolling out of sight — capped at
+// maxPromptRows, resizing the transcript viewport when the row count changes.
 // Called once per Update after the input has handled the message.
 func (m *model) syncPromptHeight() {
 	if m.pending != nil {
 		return // the approval bar replaces the prompt
 	}
-	want := m.input.LineCount()
-	if want < 1 {
-		want = 1
-	}
+	want := promptVisualRows(m.input.Value(), m.promptInnerWidth())
 	if want > maxPromptRows {
 		want = maxPromptRows
 	}
@@ -180,4 +183,15 @@ func (m *model) syncPromptHeight() {
 		m.input.SetHeight(want)
 		m.resizeViewport()
 	}
+}
+
+// promptInnerWidth is the width the textarea wraps text at: the total width we
+// gave it minus the cells its prompt string occupies (no line numbers, no
+// frame — mirrors textarea.SetWidth's reservation math for our config).
+func (m *model) promptInnerWidth() int {
+	inner := m.promptW - uniseg.StringWidth(m.input.Prompt)
+	if inner < 1 {
+		inner = 1
+	}
+	return inner
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -8,11 +9,12 @@ import (
 )
 
 func inputModel(val string) model {
-	ta := newPromptArea() // same config as the real app (keymap, prompt, …)
-	ta.SetWidth(40)
-	ta.SetValue(val)
-	ta.Focus()
-	return model{input: ta, w: 50, h: 20, ready: true}
+	m := model{w: 50, h: 20, ready: true}
+	m.input = newPromptArea() // same config as the real app (keymap, prompt, …)
+	m.setPromptWidth(40)      // inner wrap width 38 (prompt "› " is 2 cells)
+	m.input.SetValue(val)
+	m.input.Focus()
+	return m
 }
 
 // A trailing backslash turns Enter into a newline rather than a submission.
@@ -55,6 +57,43 @@ func TestPromptGrowsWithLines(t *testing.T) {
 	m.syncPromptHeight()
 	if got := m.promptRows(); got != 3 {
 		t.Errorf("promptRows = %d, want 3", got)
+	}
+}
+
+// A long single line soft-wraps in a narrow window; the prompt must grow to
+// show every wrapped row (sizing by hard lines alone left it one row tall,
+// scrolled to the cursor — typing blind). Capped at maxPromptRows.
+func TestPromptGrowsOnSoftWrap(t *testing.T) {
+	m := inputModel(strings.Repeat("word ", 20)) // ~100 cells at inner width 38
+	m.syncPromptHeight()
+	if got := m.promptRows(); got < 3 {
+		t.Errorf("~100 cells at wrap width 38 should need ≥3 rows, got %d", got)
+	}
+
+	long := inputModel(strings.Repeat("word ", 200))
+	long.syncPromptHeight()
+	if got := long.promptRows(); got != maxPromptRows {
+		t.Errorf("overflow should cap at %d rows, got %d", maxPromptRows, got)
+	}
+}
+
+// Fidelity: size the widget to our computed row count and confirm nothing is
+// clipped. SetValue leaves the cursor at the END, so the textarea scrolls its
+// tail into view — if promptVisualRows ever undercounts the real wrapped rows,
+// the FIRST token would fall off the top of the widget's view.
+func TestSoftWrapCountMatchesWidget(t *testing.T) {
+	for _, val := range []string{
+		"ALPHA short",
+		"ALPHA " + strings.Repeat("lorem ipsum dolor ", 8),
+		"ALPHA " + strings.Repeat("x", 90), // one unbroken over-width word
+		"ALPHA first\nsecond line that is long enough to wrap at width thirty-eight",
+	} {
+		m := inputModel(val)
+		rows := promptVisualRows(val, m.promptInnerWidth())
+		m.input.SetHeight(rows)
+		if view := stripANSI(m.input.View()); !strings.Contains(view, "ALPHA") {
+			t.Errorf("undercounted rows (%d) for %q — first token scrolled out:\n%s", rows, val, view)
+		}
 	}
 }
 

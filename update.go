@@ -28,7 +28,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.WindowSizeMsg:
 		m.w, m.h = msg.Width, msg.Height
-		m.input.SetWidth(msg.Width - 4)
+		m.setPromptWidth(msg.Width - 4)
 		m.resizeViewport()
 		m.makeRenderer()
 		m.rebuild()

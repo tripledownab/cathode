@@ -31,7 +31,7 @@ subscription** because we never set an API key.
 - **Live status bar** — permission mode, session id, git branch, a context-pressure gauge that auto-grows 200K → 2M, output tokens, and running cost.
 - **Info sidebar** — `ctrl+g` / `/sidebar` toggles an at-a-glance BBS info rail; `/sidebar left|right` (or `/settings`) sets the side it docks to (default right).
 - **Bring your own tools** — point `-mcp` at a `.mcp.json` to wire extra MCP tools alongside the built-in approvals server.
-- **Multi-line input** — Enter sends; insert a line break with `Alt+Enter`, `Ctrl+J`, or a trailing `\`. The prompt grows as you add lines (then scrolls).
+- **Multi-line input** — Enter sends; insert a line break with `Alt+Enter`, `Ctrl+J`, or a trailing `\`. The prompt grows with your draft — line breaks *and* soft-wrap in narrow windows — up to 8 rows, then scrolls.
 - **Prompt history & queueing** — `↑` / `↓` recalls past prompts (use `Ctrl+↑/↓` while composing a multi-line draft, where `↑/↓` move between lines); type while Claude is busy and messages queue, draining one per turn.
 
 ## Why this architecture (vs forking Crush/OpenCode)
@@ -130,6 +130,7 @@ Small files by responsibility (the project keeps each one scannable).
 | `scroll.go` | the transcript viewport + scroll / auto-follow |
 | `render.go` | `rebuild` / `renderEntry` — entries → viewport (per-entry render cache) |
 | `linkify.go` | wraps URLs in OSC 8 hyperlinks so they're clickable |
+| `promptwrap.go` | soft-wrap row counting so the prompt grows to fit its draft |
 | `diff.go` | edit-tool detection + the unified line-numbered red/green diff card |
 | `diff_split.go` | the side-by-side (split) diff card + the diff-style setting |
 | `tools.go` | typed tool-call / tool-result cards |

@@ -77,7 +77,10 @@ type model struct {
 
 	vp    viewport.Model
 	input textarea.Model
-	sp    spinner.Model
+	// promptW is the total width last given to the input (setPromptWidth), kept
+	// so syncPromptHeight can derive the inner wrap width for soft-wrap sizing.
+	promptW int
+	sp      spinner.Model
 	// follow pins the transcript to the latest line while Claude streams;
 	// cleared when the user scrolls up to read back (see scroll.go).
 	follow bool
@@ -151,6 +154,13 @@ func newPromptArea() textarea.Model {
 	return ta
 }
 
+// setPromptWidth sizes the input and records the width so syncPromptHeight
+// (render.go) can compute the inner wrap width for soft-wrap row counting.
+func (m *model) setPromptWidth(w int) {
+	m.promptW = w
+	m.input.SetWidth(w)
+}
+
 func newModel(e *Engine, mode string, a *Approvals, spin, resumeID string) model {
 	ta := newPromptArea()
 	ta.Focus()
@@ -184,7 +194,7 @@ func newModel(e *Engine, mode string, a *Approvals, spin, resumeID string) model
 		mouse:        true, // started with tea.WithMouseCellMotion in main.go
 		lastActivity: time.Now(),
 	}
-	m.input.SetWidth(defW - 4)
+	m.setPromptWidth(defW - 4)
 	m.makeRenderer()
 	// On resume, replay the last N turns from claude's own JSONL so the
 	// transcript isn't empty after re-exec. claude itself loads the session
