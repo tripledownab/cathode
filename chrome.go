@@ -24,27 +24,62 @@ func bbsBanner(width, phase int, style string) string {
 	return hdrBox.Width(width - 2).Render(title)
 }
 
+// trayMaxShown caps how many queued lines the tray lists before collapsing the
+// remainder into a "… N more" summary — so a long queue can't fill the screen.
+const trayMaxShown = 5
+
+// trayWant is how many rows the pending tray would use for a queue of length n
+// with no height pressure: a header, up to trayMaxShown message lines, and a
+// "… N more" line when some are hidden. 0 for an empty queue.
+func trayWant(n int) int {
+	if n <= 0 {
+		return 0
+	}
+	w := 1 + minInt(n, trayMaxShown)
+	if n > trayMaxShown {
+		w++
+	}
+	return w
+}
+
+// trayRows is trayWant clamped to a row budget, so the tray never claims more
+// vertical space than the layout reserved for it. resizeViewport reserves
+// exactly this many rows; pendingTray draws exactly this many. 0 disables it.
+func trayRows(n, budget int) int {
+	if budget <= 0 {
+		return 0
+	}
+	return minInt(trayWant(n), budget)
+}
+
 // pendingTray renders the queued-while-busy messages as a dim strip above the
-// input. Returns "" when the queue is empty. Truncates each line to width and
-// caps the visible count so the tray doesn't take over the viewport.
-func pendingTray(queue []string, width int) string {
-	if len(queue) == 0 {
+// input, in at most `budget` rows (see trayRows) so it can't overrun the
+// transcript on a short window. Returns "" when empty or starved of space.
+// Under pressure it drops message lines — keeping the "N queued" header and a
+// "… N more" tail — rather than spilling past its reserved height.
+func pendingTray(queue []string, width, budget int) string {
+	n := len(queue)
+	rows := trayRows(n, budget)
+	if rows == 0 {
 		return ""
 	}
-	const maxShown = 5
-	rows := []string{cDim.Render(fmt.Sprintf("▶▶▶ %d queued", len(queue)))}
-	shown := queue
-	if len(shown) > maxShown {
-		shown = shown[:maxShown]
+	out := make([]string, 0, rows)
+	out = append(out, cDim.Render(fmt.Sprintf("▶▶▶ %d queued", n)))
+	body := rows - 1 // rows left for message + "… more" lines
+	shown := minInt(n, trayMaxShown)
+	more := n > shown
+	if rows < trayWant(n) { // budget-constrained: reserve a row for "… more"
+		shown = maxInt(0, body-1)
+		more = body >= 1
 	}
-	for _, q := range shown {
+	for _, q := range queue[:shown] {
 		line := strings.ReplaceAll(q, "\n", " ")
-		rows = append(rows, cDim.Render("  ▸ "+trunc(line, width-4)))
+		out = append(out, cDim.Render("  ▸ "+trunc(line, width-4)))
 	}
-	if len(queue) > maxShown {
-		rows = append(rows, cDim.Render(fmt.Sprintf("  … %d more", len(queue)-maxShown)))
+	if more {
+		out = append(out, cDim.Render(fmt.Sprintf("  … %d more", n-shown)))
 	}
-	return strings.Join(rows, "\n")
+	return strings.Join(out, "\n")
 }
 
 // bbsScrollbar renders a vertical scrollbar `height` rows tall. Mirrors Crush's

@@ -77,15 +77,9 @@ func slashCommands() []slashCmd {
 		},
 		{
 			name: "mouse",
-			desc: "toggle mouse capture — off lets you select/copy text",
+			desc: "toggle mouse capture — off (or shift+scroll) lets you select/copy text",
 			exec: func(m *model, _ string) (model, tea.Cmd) {
-				m.mouse = !m.mouse
-				if m.mouse {
-					m.add(entInfo, "→ mouse: ON — wheel scrolls the transcript")
-					return *m, tea.EnableMouseCellMotion
-				}
-				m.add(entInfo, "→ mouse: OFF — drag to select/copy · wheel or ↑/↓ scrolls · ctrl+↑/↓ history")
-				return *m, tea.DisableMouse
+				return *m, m.setMouseCapture(!m.mouse)
 			},
 		},
 		{
@@ -327,6 +321,7 @@ func helpText() string {
 	b.WriteString("  ?             open this help modal\n")
 	b.WriteString("  ↑ / ↓         history · cursor between lines (multi-line) · scroll (mouse off)\n")
 	b.WriteString("  ctrl+↑ / ↓    prompt history (always)\n")
+	b.WriteString("  shift+scroll  drop into select mode (terminals that forward it; /mouse returns)\n")
 	b.WriteString("  esc / ctrl+c  quit\n")
 	b.WriteString("commands:\n")
 	for _, c := range cmds {

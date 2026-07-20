@@ -118,20 +118,23 @@ func (m *model) renderEntry(e entry) string {
 	return ""
 }
 
+// trayBudget is how many rows the pending tray may occupy: the transcript's
+// share of the window (total minus fixed chrome and the prompt) less a one-row
+// floor kept for the viewport. resizeViewport reserves this and renderBackground
+// draws within it — the single source that keeps the tray from overrunning the
+// chat when the window is short or the queue is deep.
+func (m *model) trayBudget() int {
+	return maxInt(0, m.h-5-m.promptRows()-1)
+}
+
 // resizeViewport sets m.vp.Width/Height based on the current window size,
 // the sidebar flag, and the pending-tray height. Call after anything that
 // changes those (window resize, sidebar toggle, queue mutation).
 func (m *model) resizeViewport() {
-	vpH := m.h - 5 - m.promptRows() // banner(3) + divider(1) + status(1) + prompt
-	// Account for the pending tray when visible.
-	if n := len(m.queue); n > 0 {
-		const maxShown = 5
-		extra := 1 + minInt(n, maxShown)
-		if n > maxShown {
-			extra++
-		}
-		vpH -= extra
-	}
+	avail := m.h - 5 - m.promptRows() // banner(3) + divider(1) + status(1) + prompt
+	// Reserve the tray's rows out of the shared space; both sides read the same
+	// budget so viewport + tray always sum to `avail` — never an overrun.
+	vpH := avail - trayRows(len(m.queue), m.trayBudget())
 	if vpH < 1 {
 		vpH = 1
 	}
@@ -171,18 +174,45 @@ func (m *model) promptRows() int {
 // window stays fully visible instead of scrolling out of sight — capped at
 // maxPromptRows, resizing the transcript viewport when the row count changes.
 // Called once per Update after the input has handled the message.
+//
+// The textarea scrolls its internal viewport while it is still the OLD height
+// (its Update runs before this), and SetHeight doesn't re-anchor — so after
+// growing we must reset that scroll or only the last row(s) stay visible.
+// reanchorPrompt does that whenever the content fits the (new) height and a
+// scroll could have happened: the height just changed, or we've come back
+// under the cap.
 func (m *model) syncPromptHeight() {
 	if m.pending != nil {
 		return // the approval bar replaces the prompt
 	}
-	want := promptVisualRows(m.input.Value(), m.promptInnerWidth())
+	rows := promptVisualRows(m.input.Value(), m.promptInnerWidth())
+	want := rows
 	if want > maxPromptRows {
 		want = maxPromptRows
 	}
-	if want != m.input.Height() {
+	changed := want != m.input.Height()
+	if changed {
 		m.input.SetHeight(want)
 		m.resizeViewport()
 	}
+	if rows <= maxPromptRows && (changed || m.lastPromptRows > maxPromptRows) {
+		m.reanchorPrompt()
+	}
+	m.lastPromptRows = rows
+}
+
+// reanchorPrompt scrolls the textarea's internal viewport back to the top —
+// the only public route is rebuilding the value (SetValue → Reset → GotoTop) —
+// and then restores the cursor: walk up to its hard line, then set the column.
+func (m *model) reanchorPrompt() {
+	row := m.input.Line()
+	li := m.input.LineInfo()
+	col := li.StartColumn + li.CharOffset
+	m.input.SetValue(m.input.Value()) // resets scroll; cursor lands at the end
+	for i := 0; i < 1000 && m.input.Line() > row; i++ {
+		m.input.CursorUp()
+	}
+	m.input.SetCursor(col)
 }
 
 // promptInnerWidth is the width the textarea wraps text at: the total width we

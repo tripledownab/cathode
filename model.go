@@ -79,8 +79,11 @@ type model struct {
 	input textarea.Model
 	// promptW is the total width last given to the input (setPromptWidth), kept
 	// so syncPromptHeight can derive the inner wrap width for soft-wrap sizing.
-	promptW int
-	sp      spinner.Model
+	// lastPromptRows is the visual row count after the previous sync, used to
+	// detect re-entry from over-the-cap so the scroll can be re-anchored.
+	promptW        int
+	lastPromptRows int
+	sp             spinner.Model
 	// follow pins the transcript to the latest line while Claude streams;
 	// cleared when the user scrolls up to read back (see scroll.go).
 	follow bool
