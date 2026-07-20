@@ -24,6 +24,20 @@ func newTranscriptViewport(w, h int) viewport.Model {
 	return vp
 }
 
+// setMouseCapture switches wheel capture on/off, notes it in the transcript, and
+// returns the Bubble Tea command that reconfigures the terminal. Shared by the
+// /mouse command and the shift+wheel gesture (see update.go) so the two entry
+// points can't drift.
+func (m *model) setMouseCapture(on bool) tea.Cmd {
+	m.mouse = on
+	if on {
+		m.add(entInfo, "→ mouse: ON — wheel scrolls the transcript")
+		return tea.EnableMouseCellMotion
+	}
+	m.add(entInfo, "→ mouse: OFF — drag to select/copy · wheel or ↑/↓ scrolls · ctrl+↑/↓ history")
+	return tea.DisableMouse
+}
+
 // syncScroll reconciles m.follow with what the user just did. Called at the tail
 // of Update, after the raw msg has been handed to the input and viewport.
 func (m *model) syncScroll(msg tea.Msg, prevInput string) {

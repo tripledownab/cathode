@@ -33,6 +33,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.makeRenderer()
 		m.rebuild()
 
+	case tea.MouseMsg:
+		// Shift+wheel is the terminal's native "let me select text" gesture. In the
+		// terminals that forward it to us (many grab it for their own scrollback and
+		// never do), take it as a shortcut into select mode — the same state /mouse
+		// off reaches. Only fires while capture is on; once off we stop receiving
+		// mouse events, so it's inherently one-way (run /mouse to come back).
+		if m.mouse && msg.Shift && tea.MouseEvent(msg).IsWheel() {
+			cmd := m.setMouseCapture(false)
+			m.refreshBody()
+			return m, tea.Batch(cmd, m.armHeaderIfNeeded())
+		}
+
 	case tea.KeyMsg:
 		nm, cmd, handled := m.handleKey(msg)
 		if handled {
