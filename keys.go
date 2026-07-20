@@ -169,6 +169,15 @@ func (m model) handleKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 			m.follow = m.vp.AtBottom()
 			return m, nil, true
 		}
+		// Editing a queued message: an up-arrow on an empty prompt pulls the last
+		// queued message back out for editing (removing it from the queue) rather
+		// than recalling from history. Re-sending then replaces it, instead of the
+		// original going out as-is while the edit lands as a second queued item.
+		if !down && len(m.queue) > 0 && strings.TrimSpace(m.input.Value()) == "" {
+			m.input.SetValue(m.dequeueLast())
+			m.input.CursorEnd()
+			return m, nil, true
+		}
 		delta := -1
 		if down {
 			delta = 1
@@ -387,4 +396,17 @@ func (m *model) sendTurn(text string) tea.Cmd {
 	}
 	m.busy = true
 	return m.armSpinnerIfNeeded()
+}
+
+// dequeueLast removes and returns the most recently queued message, growing the
+// transcript back into the space its tray row freed. Backs the up-arrow "edit
+// the queued message" path: the message is pulled out for editing so re-sending
+// replaces it, instead of the original going out as-is while the edit lands as
+// a second queued item.
+func (m *model) dequeueLast() string {
+	last := m.queue[len(m.queue)-1]
+	m.queue = m.queue[:len(m.queue)-1]
+	m.resizeViewport()
+	m.rebuild()
+	return last
 }
