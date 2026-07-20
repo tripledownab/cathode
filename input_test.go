@@ -77,6 +77,47 @@ func TestPromptGrowsOnSoftWrap(t *testing.T) {
 	}
 }
 
+// The reported bug: a newline keystroke moved the cursor to a new row while
+// the widget was still its OLD (shorter) height, scrolling its internal
+// viewport — and SetHeight doesn't reset that scroll, so the grown prompt
+// showed only the last row. Drive the REAL Update loop: type, insert a line
+// break (ctrl+j), type more — every row must stay on screen.
+func TestNewlineKeepsFirstRowVisible(t *testing.T) {
+	cur := inputModel("")
+	cur.vp = newTranscriptViewport(40, 6)
+	cur.lastActivity = time.Now()
+	feed := func(msg tea.KeyMsg) {
+		next, _ := cur.Update(msg)
+		cur = next.(model)
+		// Render between keystrokes like the real program does — the textarea's
+		// internal viewport only ingests content during View, and its scrolling
+		// (the bug's trigger) acts on that state on the NEXT keystroke.
+		_ = cur.input.View()
+	}
+	for _, r := range "ALPHA line" {
+		feed(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+	}
+	feed(tea.KeyMsg{Type: tea.KeyCtrlJ}) // the reported trigger
+	for _, r := range "second" {
+		feed(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+	}
+	if rows := cur.promptRows(); rows != 2 {
+		t.Fatalf("prompt should be 2 rows, got %d", rows)
+	}
+	view := stripANSI(cur.input.View())
+	if !strings.Contains(view, "ALPHA") {
+		t.Fatalf("first row scrolled out of view after the newline:\n%s", view)
+	}
+	if !strings.Contains(view, "second") {
+		t.Fatalf("second row missing:\n%s", view)
+	}
+	// The cursor survived the re-anchor at the end of the draft.
+	feed(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'Z'}})
+	if v := cur.input.Value(); !strings.HasSuffix(v, "secondZ") {
+		t.Fatalf("cursor not preserved at end after reanchor, value=%q", v)
+	}
+}
+
 // Fidelity: size the widget to our computed row count and confirm nothing is
 // clipped. SetValue leaves the cursor at the END, so the textarea scrolls its
 // tail into view — if promptVisualRows ever undercounts the real wrapped rows,
