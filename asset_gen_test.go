@@ -10,6 +10,7 @@ package main
 // It forces lipgloss into TrueColor so every style emits explicit 24-bit SGR.
 
 import (
+	"encoding/json"
 	"os"
 	"testing"
 
@@ -34,6 +35,7 @@ func TestGenerateAssets(t *testing.T) {
 	}{
 		{"assets/cathode-splash.svg", genSplashScreen()},
 		{"assets/cathode-preview.svg", genPreviewScreen()},
+		{"assets/cathode-question.svg", genQuestionScreen()},
 	} {
 		// Canvas + default text from the active palette (Catppuccin base #1e1e2e
 		// and text #cdd6f4) so unstyled cells sit on-theme, not on BBS black/white.
@@ -78,10 +80,11 @@ func genSplashScreen() string {
 	return splashScreen(90, 0, splashFinalFrame, 0)
 }
 
-// genPreviewScreen drives a real model through renderBackground with a small
-// sample turn: a user request, a plain reply, an Edit diff card, and the live
-// approval bar — i.e. exactly what the app paints in ask mode.
-func genPreviewScreen() string {
+// previewModel builds a real model mid-turn — a user request, a plain reply,
+// and an Edit diff card — sized so the viewport hugs its transcript. Both the
+// ask-mode preview (approval bar) and the question-modal scene share it; each
+// scene supplies its own foreground.
+func previewModel() model {
 	sp := spinner.New()
 	sp.Spinner = bbsSpinner("scan")
 	ta := textarea.New()
@@ -95,10 +98,9 @@ func genPreviewScreen() string {
 		lastCost:    0.0042,
 		ctxTokens:   24000, outTokens: 1200, ctxLimit: 200000,
 		busy: true, follow: true, ready: true,
-		sp:      sp,
-		input:   ta,
-		pending: &approvalReq{toolName: "Edit"},
-		w:       92,
+		sp:    sp,
+		input: ta,
+		w:     92,
 	}
 	m.entries = []entry{
 		{kind: entUser, text: "refactor add() to take a third arg and update the caller"},
@@ -115,5 +117,38 @@ func genPreviewScreen() string {
 	m.h = m.vp.TotalLineCount() + 6 // banner(3)+divider(1)+prompt(1)+status(1)
 	m.resizeViewport()
 	m.rebuild()
+	return m
+}
+
+// genPreviewScreen paints exactly what the app shows in ask mode: the sample
+// turn plus the live approval bar in place of the prompt.
+func genPreviewScreen() string {
+	m := previewModel()
+	m.pending = &approvalReq{toolName: "Edit"}
 	return m.renderBackground()
+}
+
+// genQuestionScreen floats the AskUserQuestion modal over the same diff scene —
+// Claude pausing mid-edit to ask which signature to use. It mirrors View()'s
+// modal path (placeOverlay of the picker on renderBackground), so the image
+// can't drift from how the app actually stacks a question over the transcript.
+// A few extra rows give the box some transcript to float over.
+func genQuestionScreen() string {
+	m := previewModel()
+	m.rebuild()
+
+	in, _ := json.Marshal(askInput{Questions: []askQuestion{{
+		Question: "How should add() take the third argument?",
+		Header:   "signature",
+		Options: []askOption{
+			{Label: "Required positional", Description: "add(a, b, c int) — update every caller"},
+			{Label: "Variadic", Description: "add(a int, rest ...int) — sum any number of args"},
+			{Label: "Options struct", Description: "add(Args{...}) — future-proof, more verbose"},
+		},
+	}}})
+	q, ok := parseAskQuestion(approvalReq{toolName: askUserQuestionTool, input: in})
+	if !ok {
+		return m.renderBackground()
+	}
+	return placeOverlay(m.renderBackground(), q.picker(m.w, m.h).View(), m.w, m.h)
 }
