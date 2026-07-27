@@ -86,9 +86,19 @@ func pendingTray(queue []string, width, budget int) string {
 // algorithm: thumb size scales with the visible portion; thumb position scales
 // linearly with the scroll offset. When content fits, returns a blank track so
 // the layout column stays stable.
-func bbsScrollbar(height, contentSize, viewportSize, offset int) string {
+func bbsScrollbar(height, contentSize, viewportSize, offset int, visible bool) string {
 	if height <= 0 {
 		return ""
+	}
+	// Auto-hidden (see scroll.go): a blank 1-col column keeps the layout width
+	// stable — no reflow — while leaving only spaces to the right of the text, so
+	// a drag-select copies clean lines instead of a column of │ pipes.
+	if !visible {
+		rows := make([]string, height)
+		for i := range rows {
+			rows[i] = " "
+		}
+		return strings.Join(rows, "\n")
 	}
 	if contentSize <= viewportSize {
 		rows := make([]string, height)

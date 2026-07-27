@@ -67,7 +67,7 @@ func (m model) renderBackground() string {
 // the optional sidebar. This is the expensive part of a frame — re-styling all
 // visible lines — so refreshBody memoizes it.
 func (m *model) renderBody() string {
-	bar := bbsScrollbar(m.vp.Height, m.vp.TotalLineCount(), m.vp.VisibleLineCount(), m.vp.YOffset)
+	bar := bbsScrollbar(m.vp.Height, m.vp.TotalLineCount(), m.vp.VisibleLineCount(), m.vp.YOffset, m.scrollbarVisible())
 	body := lipgloss.JoinHorizontal(lipgloss.Top, m.vp.View(), bar)
 	if m.sidebar && m.w >= sidebarMinWidth {
 		cwd, _ := os.Getwd()
@@ -95,6 +95,7 @@ func (m *model) refreshBody() {
 	k := bodyKey{
 		ver: m.contentVer, w: m.vp.Width, h: m.vp.Height, off: m.vp.YOffset, mw: m.w,
 		sidebar: m.sidebar, sidePos: m.settings.Sidebar, mode: m.mode, sess: m.session, mid: m.modelID, cost: m.lastCost,
+		sbVisible: m.scrollbarVisible(),
 	}
 	if k == m.bodyKey && m.frameBody != "" {
 		return

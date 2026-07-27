@@ -50,6 +50,7 @@ type bodyKey struct {
 	sidePos            string
 	mode, sess, mid    string
 	cost               float64
+	sbVisible          bool // scrollbar showing glyphs vs auto-hidden (blank) — see scroll.go
 }
 
 // model is the Bubble Tea model. Field grouping mirrors the lifecycle:
@@ -87,6 +88,13 @@ type model struct {
 	// follow pins the transcript to the latest line while Claude streams;
 	// cleared when the user scrolls up to read back (see scroll.go).
 	follow bool
+	// scrollShownAt is when the user last scrolled the transcript. The right-edge
+	// scrollbar shows its │/┃ glyphs only for scrollbarHideAfter past it, then
+	// blanks to spaces — so drag-selecting to copy doesn't drag a column of pipes
+	// into the clipboard. scrollTicking guards the one hide tick in flight
+	// (mirrors animating/spinning). See scroll.go.
+	scrollShownAt time.Time
+	scrollTicking bool
 	// animating/spinning track whether a header / spinner tick is already in
 	// flight, so exactly one is armed and an idle screen (static header, not
 	// busy) stops redrawing instead of waking the runtime many times a second.

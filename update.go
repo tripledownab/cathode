@@ -46,6 +46,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case tea.KeyMsg:
+		prevOff := m.vp.YOffset
 		nm, cmd, handled := m.handleKey(msg)
 		if handled {
 			// Handled keys return early, bypassing the tail below. Resize the prompt
@@ -53,6 +54,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// may have scrolled or added an entry), and re-wake the header (the key
 			// counted as activity). All no-op when nothing changed.
 			nm.syncPromptHeight()
+			// PageUp/Down (or ↑/↓ in select mode) may have scrolled — surface the
+			// scrollbar so the user sees where they are, then let it auto-hide.
+			if nm.vp.YOffset != prevOff {
+				cmd = tea.Batch(cmd, nm.pokeScrollbar())
+			}
 			nm.refreshBody()
 			return nm, tea.Batch(cmd, nm.armHeaderIfNeeded())
 		}
@@ -88,6 +94,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.splashFrame++
 		return m, splashTick()
+
+	case scrollHideMsg:
+		// The visibility window may have been extended by a later scroll: re-arm
+		// for the remainder, else let it lapse and fall through to the tail, where
+		// refreshBody re-renders the column blank.
+		if remaining := scrollbarHideAfter - time.Since(m.scrollShownAt); remaining > 0 {
+			cmds = append(cmds, scrollHideTick(remaining))
+		} else {
+			m.scrollTicking = false
+		}
 
 	case streamMsg:
 		m.handleEvent(msg.env)
@@ -129,11 +145,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	prevInput := m.input.Value()
+	prevOff := m.vp.YOffset
 	var cmd tea.Cmd
 	m.input, cmd = m.input.Update(msg)
 	cmds = append(cmds, cmd)
 	m.vp, cmd = m.vp.Update(msg)
 	cmds = append(cmds, cmd)
+	// A wheel scroll moved the viewport here (keys are handled above; streaming
+	// scrolls via rebuild's GotoBottom, not this path), so this only fires on a
+	// genuine user gesture — surface the scrollbar and let it auto-hide.
+	if m.vp.YOffset != prevOff {
+		if c := m.pokeScrollbar(); c != nil {
+			cmds = append(cmds, c)
+		}
+	}
 	m.syncScroll(msg, prevInput)
 	// Grow/shrink the prompt to fit its line count (resizes the viewport when it
 	// changes), then recompute the memoized transcript body if its inputs changed

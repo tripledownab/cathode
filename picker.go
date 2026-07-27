@@ -227,7 +227,7 @@ func (p *picker) View() string {
 		}
 		// Themed BBS scrollbar gutter, mirroring the transcript's — replaces the
 		// old "N more…" text so a long session/command list scrolls in-theme.
-		bar := bbsScrollbar(len(rows), len(p.filtered), len(rows), start)
+		bar := bbsScrollbar(len(rows), len(p.filtered), len(rows), start, true)
 		section = lipgloss.JoinHorizontal(lipgloss.Top, strings.Join(rows, "\n"), bar)
 	}
 
