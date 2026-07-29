@@ -32,7 +32,7 @@ subscription** because we never set an API key.
 - **Info sidebar** — `ctrl+g` / `/sidebar` toggles an at-a-glance BBS info rail; `/sidebar left|right` (or `/settings`) sets the side it docks to (default right).
 - **Bring your own tools** — point `-mcp` at a `.mcp.json` to wire extra MCP tools alongside the built-in approvals server.
 - **Multi-line input** — Enter sends; insert a line break with `Alt+Enter`, `Ctrl+J`, or a trailing `\`. The prompt grows with your draft — line breaks *and* soft-wrap in narrow windows — up to 8 rows, then scrolls.
-- **Prompt history & queueing** — `↑` / `↓` recalls past prompts (use `Ctrl+↑/↓` while composing a multi-line draft, where `↑/↓` move between lines); type while Claude is busy and messages queue, draining one per turn.
+- **Prompt history & steering** — `↑` / `↓` recalls past prompts (use `Ctrl+↑/↓` while composing a multi-line draft, where `↑/↓` move between lines); type while Claude is busy and the message is injected into the running turn, so you can course-correct mid-flight instead of waiting for it to finish (`Esc` interrupts the turn to undo a mis-sent steer).
 
 ## Why this architecture (vs forking Crush/OpenCode)
 
@@ -140,7 +140,7 @@ Small files by responsibility (the project keeps each one scannable).
 
 | file | role |
 |------|------|
-| `chrome.go` | banner, scrollbar, spinner frames, queued-message tray |
+| `chrome.go` | banner, scrollbar, spinner frames |
 | `status.go` | the DOS-style status bar + context gauge + git branch |
 | `sidebar.go` | the BBS info rail |
 | `theme.go` | palettes, styles, `applyTheme`, the theme list |

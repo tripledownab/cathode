@@ -118,23 +118,11 @@ func (m *model) renderEntry(e entry) string {
 	return ""
 }
 
-// trayBudget is how many rows the pending tray may occupy: the transcript's
-// share of the window (total minus fixed chrome and the prompt) less a one-row
-// floor kept for the viewport. resizeViewport reserves this and renderBackground
-// draws within it — the single source that keeps the tray from overrunning the
-// chat when the window is short or the queue is deep.
-func (m *model) trayBudget() int {
-	return maxInt(0, m.h-5-m.promptRows()-1)
-}
-
-// resizeViewport sets m.vp.Width/Height based on the current window size,
-// the sidebar flag, and the pending-tray height. Call after anything that
-// changes those (window resize, sidebar toggle, queue mutation).
+// resizeViewport sets m.vp.Width/Height based on the current window size and
+// the sidebar flag. Call after anything that changes those (window resize,
+// sidebar toggle, prompt height change).
 func (m *model) resizeViewport() {
-	avail := m.h - 5 - m.promptRows() // banner(3) + divider(1) + status(1) + prompt
-	// Reserve the tray's rows out of the shared space; both sides read the same
-	// budget so viewport + tray always sum to `avail` — never an overrun.
-	vpH := avail - trayRows(len(m.queue), m.trayBudget())
+	vpH := m.h - 5 - m.promptRows() // banner(3) + divider(1) + status(1) + prompt
 	if vpH < 1 {
 		vpH = 1
 	}

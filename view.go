@@ -53,9 +53,6 @@ func (m model) renderBackground() string {
 		sceneDivider(leet("session"), m.w),
 		body,
 	}
-	if tray := pendingTray(m.queue, m.w, m.trayBudget()); tray != "" {
-		parts = append(parts, tray)
-	}
 	parts = append(parts,
 		prompt,
 		bbsStatus(m.mode, m.modelID, m.session, gitBranch(), m.lastCost, m.ctxTokens, m.outTokens, m.ctxLimit, m.busy, m.sp.View(), m.w),

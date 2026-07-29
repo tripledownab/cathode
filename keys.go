@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -169,15 +168,6 @@ func (m model) handleKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 			m.follow = m.vp.AtBottom()
 			return m, nil, true
 		}
-		// Editing a queued message: an up-arrow on an empty prompt pulls the last
-		// queued message back out for editing (removing it from the queue) rather
-		// than recalling from history. Re-sending then replaces it, instead of the
-		// original going out as-is while the edit lands as a second queued item.
-		if !down && len(m.queue) > 0 && strings.TrimSpace(m.input.Value()) == "" {
-			m.input.SetValue(m.dequeueLast())
-			m.input.CursorEnd()
-			return m, nil, true
-		}
 		delta := -1
 		if down {
 			delta = 1
@@ -314,17 +304,10 @@ func (m *model) cancelQuestion() tea.Cmd {
 	return waitApproval(m.approvals)
 }
 
-// handleEsc cascades: clear queue → interrupt in-flight → quit. So a stray
-// Esc with messages queued or work in flight never drops the whole session.
+// handleEsc cascades: interrupt in-flight → quit. So a stray Esc with work in
+// flight aborts the current turn (the way to undo a mis-sent steer) rather than
+// dropping the whole session.
 func (m model) handleEsc() (model, tea.Cmd, bool) {
-	if len(m.queue) > 0 {
-		dropped := len(m.queue)
-		m.queue = nil
-		m.resizeViewport()
-		m.rebuild()
-		m.add(entInfo, fmt.Sprintf("dropped %d queued message(s)", dropped))
-		return m, nil, true
-	}
 	if m.busy {
 		if err := m.engine.Interrupt(); err != nil {
 			m.add(entError, "interrupt failed: "+err.Error())
@@ -370,43 +353,28 @@ func (m model) handleEnter() (model, tea.Cmd, bool) {
 	return m, cmd, true
 }
 
-// sendTurn submits text as a user turn — queued while claude is busy, otherwise
-// sent now — recording it in history and returning the working-spinner Cmd.
-// Shared by Enter (typed prompts and forwarded slash commands) and the command
-// palette, so all three reach claude the same way.
+// sendTurn submits text as a user turn. When claude is already working the
+// message is handed to the running subprocess right away, so claude injects it
+// into the turn at its next step boundary (steering) — you can course-correct
+// mid-flight instead of waiting for the turn to end. Idle, it opens a fresh
+// turn. Either way it lands in the transcript now, is recorded in history, and
+// arms the working spinner. Shared by Enter (typed prompts and forwarded slash
+// commands) and the command palette, so all reach claude the same way.
 func (m *model) sendTurn(text string) tea.Cmd {
 	m.hist.Append(text)
-	// Busy: queue the message instead of dropping it on the floor.
-	if m.busy {
-		m.queue = append(m.queue, text)
-		m.resizeViewport()
-		m.rebuild()
-		return nil
-	}
+	steering := m.busy
 	m.add(entUser, text)
 	if err := m.engine.Send(text); err != nil {
 		m.add(entError, "send error: "+err.Error())
 		return nil
 	}
 	// Capture the first prompt for the session so the resume picker has a
-	// human-recognisable label.
-	if m.session != "" {
+	// human-recognisable label — only when opening a turn, so a mid-turn steer
+	// doesn't overwrite it with a follow-up correction.
+	if !steering && m.session != "" {
 		cwd, _ := os.Getwd()
 		m.sessions.Touch(m.session, m.modelID, cwd, truncFirst(text), time.Now())
 	}
 	m.busy = true
 	return m.armSpinnerIfNeeded()
-}
-
-// dequeueLast removes and returns the most recently queued message, growing the
-// transcript back into the space its tray row freed. Backs the up-arrow "edit
-// the queued message" path: the message is pulled out for editing so re-sending
-// replaces it, instead of the original going out as-is while the edit lands as
-// a second queued item.
-func (m *model) dequeueLast() string {
-	last := m.queue[len(m.queue)-1]
-	m.queue = m.queue[:len(m.queue)-1]
-	m.resizeViewport()
-	m.rebuild()
-	return last
 }

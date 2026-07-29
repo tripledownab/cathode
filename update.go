@@ -1,7 +1,6 @@
 package main
 
 import (
-	"os"
 	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
@@ -211,24 +210,3 @@ func (m *model) armSpinnerIfNeeded() tea.Cmd {
 	return nil
 }
 
-// flushQueue pops the front of the queue (if any), sends it, and re-enters
-// busy mode. Called when a turn ends; remaining items wait for the next
-// result event.
-func (m *model) flushQueue() {
-	if len(m.queue) == 0 {
-		return
-	}
-	next := m.queue[0]
-	m.queue = m.queue[1:]
-	m.resizeViewport()
-	m.add(entUser, next)
-	if err := m.engine.Send(next); err != nil {
-		m.add(entError, "send error: "+err.Error())
-		return
-	}
-	if m.session != "" {
-		cwd, _ := os.Getwd()
-		m.sessions.Touch(m.session, m.modelID, cwd, truncFirst(next), time.Now())
-	}
-	m.busy = true
-}

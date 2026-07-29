@@ -126,7 +126,6 @@ type model struct {
 	frameBody  string
 	bodyKey    bodyKey
 	contentVer int
-	queue      []string          // user messages typed while busy; drained one per turn end
 	toolUses   map[string]string // tool_use_id -> tool name, so tool_result events can show what they're answering
 	busy       bool
 	mode       string

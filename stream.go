@@ -136,6 +136,5 @@ func (m *model) handleEvent(e Envelope) {
 		}
 		m.add(entInfo, fmt.Sprintf("— done · %.4f USD · %dms · %d turns —",
 			e.TotalCostUSD, e.DurationMS, e.NumTurns))
-		m.flushQueue()
 	}
 }
