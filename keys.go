@@ -234,9 +234,7 @@ func (m model) handleKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 
 	switch msg.Type {
 	case tea.KeyCtrlC:
-		// Just quit — the subprocess is closed in main after Run() returns.
-		// Closing it here would block the Update loop (see Engine.Close).
-		return m, tea.Quit, true
+		return m.handleCtrlC()
 	case tea.KeyEsc:
 		return m.handleEsc()
 	case tea.KeyEnter:
@@ -260,8 +258,14 @@ func (m model) handleApprovalKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 		m.pending = nil
 		return m, waitApproval(m.approvals), true
 	case "ctrl+c":
+		// Deny this tool (cancel the pending action) and arm the exit hint, but
+		// don't quit on the first press — a second Ctrl+C within the window does,
+		// matching the main handler. The waiter is re-armed so the session runs on.
 		m.pending.reply <- approvalReply{allow: false}
-		return m, tea.Quit, true
+		m.add(entInfo, "✗ denied "+m.pending.toolName)
+		m.pending = nil
+		m.ctrlCAt = time.Now()
+		return m, tea.Batch(waitApproval(m.approvals), ctrlCHintTick()), true
 	default:
 		m.pending.reply <- approvalReply{allow: true}
 		m.add(entInfo, "✓ approved "+m.pending.toolName)
@@ -309,17 +313,57 @@ func (m *model) cancelQuestion() tea.Cmd {
 // dropping the whole session.
 func (m model) handleEsc() (model, tea.Cmd, bool) {
 	if m.busy {
-		if err := m.engine.Interrupt(); err != nil {
-			m.add(entError, "interrupt failed: "+err.Error())
-		} else {
-			m.add(entInfo, "✗ interrupted")
-		}
-		// Flip busy off proactively: claude may still emit late events, but
-		// the user gets the prompt back immediately.
-		m.busy = false
-		return m, nil, true
+		return m.interrupt(), nil, true
 	}
 	return m, tea.Quit, true
+}
+
+// ctrlCExitWindow is how long after a Ctrl+C a second one still means "exit".
+const ctrlCExitWindow = 2 * time.Second
+
+// ctrlCHintMsg fires ctrlCExitWindow after a Ctrl+C so the status bar repaints
+// once the "again to exit" hint has lapsed (the frame it triggers recomputes
+// ctrlCArmed, which is now false). See handleCtrlC.
+type ctrlCHintMsg struct{}
+
+func ctrlCHintTick() tea.Cmd {
+	return tea.Tick(ctrlCExitWindow, func(time.Time) tea.Msg { return ctrlCHintMsg{} })
+}
+
+// ctrlCArmed reports whether a Ctrl+C landed recently enough that the next one
+// exits — which is also when the status bar shows the "^C again to exit" hint.
+func (m model) ctrlCArmed() bool {
+	return !m.ctrlCAt.IsZero() && time.Since(m.ctrlCAt) < ctrlCExitWindow
+}
+
+// handleCtrlC gives Ctrl+C the Claude-Code cadence: the first press cancels the
+// running turn (or, when idle, just arms) and shows an "again to exit" hint; a
+// second press within ctrlCExitWindow quits. So a reflexive Ctrl+C stops the
+// work instead of dropping the whole session, but a deliberate double-tap still
+// exits fast. Quitting returns tea.Quit without closing the engine — main tears
+// the subprocess down after Run() (closing it here deadlocks; see Engine.Close).
+func (m model) handleCtrlC() (model, tea.Cmd, bool) {
+	if m.ctrlCArmed() {
+		return m, tea.Quit, true
+	}
+	m.ctrlCAt = time.Now()
+	if m.busy {
+		m = m.interrupt()
+	}
+	return m, ctrlCHintTick(), true
+}
+
+// interrupt aborts the in-flight turn and hands the prompt back. Shared by Esc
+// and Ctrl+C. busy is flipped off proactively — claude may still emit a few late
+// events, but the user gets the prompt back immediately.
+func (m model) interrupt() model {
+	if err := m.engine.Interrupt(); err != nil {
+		m.add(entError, "interrupt failed: "+err.Error())
+	} else {
+		m.add(entInfo, "✗ interrupted")
+	}
+	m.busy = false
+	return m
 }
 
 // handleEnter dispatches a non-empty submission: slash commands run in-process,

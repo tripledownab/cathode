@@ -104,6 +104,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.scrollTicking = false
 		}
 
+	case ctrlCHintMsg:
+		// The exit window lapsed: clear the arm so the status drops the "again to
+		// exit" hint on this frame. Guarded so a newer Ctrl+C that re-armed within
+		// the window isn't cleared by an older tick.
+		if !m.ctrlCArmed() {
+			m.ctrlCAt = time.Time{}
+		}
+
 	case streamMsg:
 		m.handleEvent(msg.env)
 

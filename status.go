@@ -158,7 +158,7 @@ func shortModel(s string) string {
 // bbsStatus renders the DOS-style full-width status line. Each segment is
 // styled individually with the cyan background so the bar stays contiguous
 // even when nested-style chunks (the context-bar gradient) emit SGR resets.
-func bbsStatus(mode, model, session, branch string, cost float64, ctxTok, outTok, ctxLimit int, busy bool, spin string, width int) string {
+func bbsStatus(mode, model, session, branch string, cost float64, ctxTok, outTok, ctxLimit int, busy, armed bool, spin string, width int) string {
 	if width < 1 {
 		width = 1
 	}
@@ -213,8 +213,12 @@ func bbsStatus(mode, model, session, branch string, cost float64, ctxTok, outTok
 
 	// The live state indicator — spinner + WORKING while busy, READY otherwise —
 	// is pushed flush to the right edge, so the working spinner animates in the
-	// bottom-right corner with the gap padding swallowed in the middle.
+	// bottom-right corner with the gap padding swallowed in the middle. A recent
+	// Ctrl+C replaces it with the exit hint until the window lapses.
 	right := sbarBase.Render(state + " ")
+	if armed {
+		right = sbarRed.Render("^C AGAIN TO EXIT ")
+	}
 	if gap := width - lipgloss.Width(left) - lipgloss.Width(right); gap > 0 {
 		return left + sbarBase.Render(strings.Repeat(" ", gap)) + right
 	}
