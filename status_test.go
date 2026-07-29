@@ -1,6 +1,22 @@
 package main
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
+
+// A recent Ctrl+C (armed) swaps the right-hand READY/WORKING indicator for the
+// "again to exit" hint, so the user sees that a second press quits.
+func TestStatusShowsCtrlCExitHint(t *testing.T) {
+	ready := bbsStatus("ask", "opus", "sess", "", 0, 0, 0, 200_000, false, false, "", 80)
+	if !strings.Contains(ready, "READY") || strings.Contains(ready, "AGAIN TO EXIT") {
+		t.Errorf("unarmed status should show READY, not the exit hint:\n%s", ready)
+	}
+	armed := bbsStatus("ask", "opus", "sess", "", 0, 0, 0, 200_000, false, true, "", 80)
+	if !strings.Contains(armed, "AGAIN TO EXIT") || strings.Contains(armed, "READY") {
+		t.Errorf("armed status should show the exit hint, not READY:\n%s", armed)
+	}
+}
 
 func TestShortModel(t *testing.T) {
 	cases := map[string]string{

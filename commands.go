@@ -322,7 +322,8 @@ func helpText() string {
 	b.WriteString("  ↑ / ↓         history · cursor between lines (multi-line) · scroll (mouse off)\n")
 	b.WriteString("  ctrl+↑ / ↓    prompt history (always)\n")
 	b.WriteString("  shift+scroll  drop into select mode (terminals that forward it; /mouse returns)\n")
-	b.WriteString("  esc / ctrl+c  quit\n")
+	b.WriteString("  esc           interrupt the running turn (or quit when idle)\n")
+	b.WriteString("  ctrl+c        interrupt the running turn · again to quit\n")
 	b.WriteString("commands:\n")
 	for _, c := range cmds {
 		b.WriteString(fmt.Sprintf("  /%-10s %s\n", c.name, c.desc))

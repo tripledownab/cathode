@@ -55,7 +55,7 @@ func (m model) renderBackground() string {
 	}
 	parts = append(parts,
 		prompt,
-		bbsStatus(m.mode, m.modelID, m.session, gitBranch(), m.lastCost, m.ctxTokens, m.outTokens, m.ctxLimit, m.busy, m.sp.View(), m.w),
+		bbsStatus(m.mode, m.modelID, m.session, gitBranch(), m.lastCost, m.ctxTokens, m.outTokens, m.ctxLimit, m.busy, m.ctrlCArmed(), m.sp.View(), m.w),
 	)
 	return strings.Join(parts, "\n")
 }

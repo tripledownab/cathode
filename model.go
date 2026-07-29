@@ -105,6 +105,10 @@ type model struct {
 	// left untouched overnight goes fully quiescent (no per-frame redraws / GC
 	// churn) and wakes on the next interaction. See shouldAnimateHeader.
 	lastActivity time.Time
+	// ctrlCAt is when Ctrl+C was last pressed. The first press cancels the running
+	// turn (or, idle, does nothing) and arms an "again to exit" hint; a second
+	// press within ctrlCExitWindow quits. Zero means unarmed. See handleCtrlC.
+	ctrlCAt time.Time
 
 	entries []entry
 	// content accumulates the rendered transcript so each new entry is appended
