@@ -156,6 +156,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	m.input, cmd = m.input.Update(msg)
 	cmds = append(cmds, cmd)
+	// Reconcile the inline @-file menu with the prompt after the textarea has
+	// applied the key. Only on typed input (which may open/change it) or while
+	// it's already open — stream events don't touch the prompt (complete.go).
+	if _, isKey := msg.(tea.KeyMsg); isKey || m.comp != nil {
+		m.syncCompletion()
+	}
 	m.vp, cmd = m.vp.Update(msg)
 	cmds = append(cmds, cmd)
 	// A wheel scroll moved the viewport here (keys are handled above; streaming
@@ -217,4 +223,3 @@ func (m *model) armSpinnerIfNeeded() tea.Cmd {
 	}
 	return nil
 }
-

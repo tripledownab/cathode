@@ -24,6 +24,17 @@ func (m model) View() string {
 	if m.help {
 		return placeOverlay(bg, helpModalView(m.w, m.h), m.w, m.h)
 	}
+	// The inline @-file menu floats just above the prompt rather than centered:
+	// its last row sits on the line above the prompt (banner+divider+viewport is
+	// m.h-1-promptRows tall; status is the final row). See complete.go.
+	if m.comp != nil {
+		menu := m.comp.View(m.w)
+		y := m.h - 1 - m.promptRows() - lipgloss.Height(menu)
+		if y < 0 {
+			y = 0
+		}
+		return placeOverlayAt(bg, menu, 2, y)
+	}
 	return bg
 }
 

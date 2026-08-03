@@ -145,6 +145,15 @@ func (m model) handleKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 		return m.handleApprovalKey(msg)
 	}
 
+	// While the inline @-file menu is open it owns navigation/accept/dismiss so
+	// Enter inserts a path instead of submitting the turn; everything else falls
+	// through to the textarea, and syncCompletion re-derives the query (complete.go).
+	if m.comp != nil {
+		if nm, cmd, handled := m.handleCompletionKey(msg); handled {
+			return nm, cmd, true
+		}
+	}
+
 	// Arrow keys: prompt history, except with mouse capture off (/mouse), where
 	// the terminal turns the wheel into ↑/↓ — there we scroll the transcript so
 	// older output can be brought into view to select. Ctrl-↑/↓ always do
