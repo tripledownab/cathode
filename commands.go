@@ -314,6 +314,7 @@ func helpText() string {
 	var b strings.Builder
 	b.WriteString("keybindings:\n")
 	b.WriteString("  enter         send  ·  alt+enter / ctrl+j / \\↵  insert a line break\n")
+	b.WriteString("  @             inline file picker — inserts @path (claude expands it to file contents)\n")
 	b.WriteString("  shift+tab     cycle mode (plan → ask → build)\n")
 	b.WriteString("  ctrl+r        resume a session\n")
 	b.WriteString("  ctrl+t        slash command palette\n")
