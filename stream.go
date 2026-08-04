@@ -17,6 +17,12 @@ func (m *model) handleEvent(e Envelope) {
 			m.session, m.modelID = e.Session, e.Model
 			cwd, _ := os.Getwd()
 			m.sessions.Touch(e.Session, e.Model, cwd, "", time.Now())
+			// The server list only arrives here (not in the initialize handshake),
+			// so cache it for the /mcp picker; keep the last non-empty snapshot the
+			// way commands/agents are handled.
+			if len(e.MCPServers) > 0 {
+				m.mcpServers = e.MCPServers
+			}
 			m.add(entInfo, fmt.Sprintf("— session %s · %s —", short(e.Session), e.Model))
 		case "hook_response":
 			// Routine successful hooks (SessionStart, PreToolUse, …) fire constantly
@@ -51,6 +57,11 @@ func (m *model) handleEvent(e Envelope) {
 		}
 	case "assistant":
 		if e.Message == nil {
+			return
+		}
+		// A silent /mcp prime (mcp.go): swallow its text status — the picker opens
+		// on the result instead, so the transcript stays clean.
+		if m.mcpPriming {
 			return
 		}
 		if u := e.Message.Usage; u != nil {
@@ -131,6 +142,13 @@ func (m *model) handleEvent(e Envelope) {
 	case "result":
 		m.busy = false
 		m.lastCost = e.TotalCostUSD
+		// End of a silent /mcp prime: don't print the "— done —" line — just open
+		// the picker now that init has cached the server list (mcp.go).
+		if m.mcpPriming {
+			m.mcpPriming = false
+			m.openMCPPicker()
+			return
+		}
 		if e.IsError {
 			m.add(entError, "✗ "+e.Result)
 		}

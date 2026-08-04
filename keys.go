@@ -109,6 +109,20 @@ func (m model) handleKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 		case "model":
 			m.applyModel(chosen)
 			return m, nil, true
+		case "mcp":
+			// A server was chosen — open its (status-dependent) action menu.
+			status := ""
+			for _, s := range m.mcpServers {
+				if s.Name == chosen {
+					status = s.Status
+					break
+				}
+			}
+			m.picker = newPicker("mcpaction", "MCP · "+chosen, mcpActionItems(chosen, status), m.w, m.h)
+			return m, nil, true
+		case "mcpaction":
+			// chosen is the full /mcp argument, e.g. "reconnect foo".
+			return m, m.sendMCP(chosen), true
 		case "settings":
 			// Top-level menu: open the chosen setting's picker, pre-positioned.
 			switch chosen {

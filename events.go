@@ -38,6 +38,10 @@ type Envelope struct {
 	Outcome  string `json:"outcome"`
 	Stderr   string `json:"stderr"`
 
+	// system/init also reports the configured MCP servers and their status;
+	// drives the /mcp picker (see mcp.go). Only present on the init line.
+	MCPServers []MCPServerInfo `json:"mcp_servers"`
+
 	// control_response-only (e.g. the reply to our initialize handshake)
 	Response *ControlResp `json:"response"`
 }
@@ -76,6 +80,16 @@ type CommandInfo struct {
 type AgentInfo struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
+}
+
+// MCPServerInfo is one entry in the system:init mcp_servers list — a configured
+// MCP server and its connection status ("connected", "needs-auth", "failed",
+// "disabled", …). Drives the /mcp picker (mcp.go). The interactive server modal
+// is a real-terminal feature the headless CLI can't render, so we reconstruct
+// it from this list.
+type MCPServerInfo struct {
+	Name   string `json:"name"`
+	Status string `json:"status"`
 }
 
 // ModelChoice is one entry in the initialize model list — the same set the
