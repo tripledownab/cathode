@@ -64,6 +64,13 @@ func slashCommands() []slashCmd {
 			},
 		},
 		{
+			name: "mcp",
+			desc: "manage MCP servers — status, reconnect/enable/disable",
+			exec: func(m *model, arg string) (model, tea.Cmd) {
+				return m.mcpCommand(arg)
+			},
+		},
+		{
 			name: "model",
 			desc: "switch model (opus|sonnet|haiku|<id>)",
 			exec: func(m *model, arg string) (model, tea.Cmd) {

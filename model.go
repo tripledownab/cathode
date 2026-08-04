@@ -139,9 +139,11 @@ type model struct {
 	mode       string
 	session    string
 	modelID    string
-	models     []ModelChoice // model menu from the initialize handshake; drives /model (see models.go)
-	commands   []CommandInfo // command list from the handshake; merged into the palette (built-ins + skills + plugins)
-	agents     []AgentInfo   // subagent list from the handshake; shown by /agents
+	models     []ModelChoice   // model menu from the initialize handshake; drives /model (see models.go)
+	commands   []CommandInfo   // command list from the handshake; merged into the palette (built-ins + skills + plugins)
+	agents     []AgentInfo     // subagent list from the handshake; shown by /agents
+	mcpServers []MCPServerInfo // MCP servers + status from system:init; drives /mcp (see mcp.go)
+	mcpPriming bool            // true while a silent /mcp fetch is in flight; its echo is swallowed and the picker opens on result (mcp.go)
 	lastCost   float64
 	// Running token totals across the session. ctxTokens is the most recent
 	// turn's "live" context size (input + cache_read + cache_creation), which
