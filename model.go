@@ -127,6 +127,12 @@ type model struct {
 	content       *strings.Builder
 	renderedCount int
 	cacheWidth    int
+	// entryLine[i] is the content line entry i starts on; lineCount is how many
+	// lines are in the buffer so far. Both are maintained by appendEntry and
+	// cleared with the buffer, so they can't drift from what the viewport shows.
+	// jump.go uses them to scroll a chosen prompt to the top (shift+↑/↓).
+	entryLine []int
+	lineCount int
 	// frameBody memoizes the composed transcript body (viewport + scrollbar +
 	// sidebar) — ~80% of a frame's cost, and identical between frames while you
 	// type or the wordmark shimmers. refreshBody (update.go) rebuilds it only

@@ -32,6 +32,7 @@ subscription** because we never set an API key.
 - **Info sidebar** — `ctrl+g` / `/sidebar` toggles an at-a-glance BBS info rail; `/sidebar left|right` (or `/settings`) sets the side it docks to (default right).
 - **Bring your own tools** — point `-mcp` at a `.mcp.json` to wire extra MCP tools alongside the built-in approvals server.
 - **Multi-line input** — Enter sends; insert a line break with `Alt+Enter`, `Ctrl+J`, or a trailing `\`. The prompt grows with your draft — line breaks *and* soft-wrap in narrow windows — up to 8 rows, then scrolls.
+- **Jump back through your prompts** — `Shift+↑` / `Shift+↓` scroll the transcript one *turn* at a time, parking each of your past prompts at the top of the view; stepping past the newest one drops you back at the live bottom.
 - **Prompt history & steering** — `↑` / `↓` recalls past prompts (use `Ctrl+↑/↓` while composing a multi-line draft, where `↑/↓` move between lines); type while Claude is busy and the message is injected into the running turn, so you can course-correct mid-flight instead of waiting for it to finish (`Esc` interrupts the turn to undo a mis-sent steer).
 
 ## Why this architecture (vs forking Crush/OpenCode)

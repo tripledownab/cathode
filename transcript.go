@@ -11,16 +11,12 @@ import (
 // claudeRecord is the minimal shape we need from one line of claude's session
 // JSONL. Each turn writes a {"type":"user"|"assistant", "message":{...}} record;
 // many other record types (queue-operation, summary, hook events) get ignored.
+// Content stays raw because claude writes it two ways — see contentBlocks.
 type claudeRecord struct {
 	Type    string `json:"type"`
 	Message *struct {
-		Role    string `json:"role"`
-		Content []struct {
-			Type  string          `json:"type"`
-			Text  string          `json:"text"`
-			Name  string          `json:"name"`
-			Input json.RawMessage `json:"input"`
-		} `json:"content"`
+		Role    string          `json:"role"`
+		Content json.RawMessage `json:"content"`
 		// usage is present on assistant records; its input + cache totals give
 		// the context size at that turn, which we replay into the gauge on
 		// resume (see loadPriorTranscript / model.go).
@@ -28,25 +24,45 @@ type claudeRecord struct {
 	} `json:"message"`
 }
 
-// projectSlug encodes a cwd the same way claude does — every `/` replaced with
-// `-` — so `/Users/foo/bar` becomes `-Users-foo-bar`.
-func projectSlug(cwd string) string {
-	return strings.ReplaceAll(cwd, "/", "-")
+// contentBlock is one element of a message's content array.
+type contentBlock struct {
+	Type  string          `json:"type"`
+	Text  string          `json:"text"`
+	Name  string          `json:"name"`
+	Input json.RawMessage `json:"input"`
+}
+
+// contentBlocks decodes both encodings claude uses for message.content: an
+// array of typed blocks, or a bare string for a plain typed prompt. Decoding
+// the bare-string form into a []contentBlock fails, and the record it belongs
+// to is the user's own prompt — so treating that as "unparseable, skip" dropped
+// half the conversation out of a replayed transcript.
+func contentBlocks(raw json.RawMessage) []contentBlock {
+	var s string
+	if err := json.Unmarshal(raw, &s); err == nil {
+		if strings.TrimSpace(s) == "" {
+			return nil
+		}
+		return []contentBlock{{Type: "text", Text: s}}
+	}
+	var blocks []contentBlock
+	_ = json.Unmarshal(raw, &blocks)
+	return blocks
 }
 
 // sessionTranscriptPath returns the on-disk path to claude's JSONL transcript
 // for the given session, scoped to the current cwd. Returns "" + error if the
 // home dir or cwd can't be resolved.
 func sessionTranscriptPath(sessionID string) (string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
 	cwd, err := os.Getwd()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(home, ".claude", "projects", projectSlug(cwd), sessionID+".jsonl"), nil
+	dir, err := claudeProjectDir(cwd)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, sessionID+".jsonl"), nil
 }
 
 // loadPriorTranscript reads claude's persisted session for sessionID and
@@ -68,7 +84,7 @@ func loadPriorTranscript(sessionID string, maxEntries int) (entries []entry, ctx
 	defer f.Close()
 
 	sc := bufio.NewScanner(f)
-	sc.Buffer(make([]byte, 0, 64*1024), 16*1024*1024) // tool results can be large
+	sc.Buffer(make([]byte, 0, 64*1024), maxRecordBytes) // tool results can be large
 	for sc.Scan() {
 		var rec claudeRecord
 		if err := json.Unmarshal(sc.Bytes(), &rec); err != nil || rec.Message == nil {
@@ -80,7 +96,7 @@ func loadPriorTranscript(sessionID string, maxEntries int) (entries []entry, ctx
 			u := rec.Message.Usage
 			ctxTokens = u.InputTokens + u.CacheReadInputTokens + u.CacheCreationInputTokens
 		}
-		for _, c := range rec.Message.Content {
+		for _, c := range contentBlocks(rec.Message.Content) {
 			switch c.Type {
 			case "text":
 				if t := strings.TrimSpace(c.Text); t != "" {
