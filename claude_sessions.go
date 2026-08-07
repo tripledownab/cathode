@@ -9,17 +9,6 @@ import (
 	"strings"
 )
 
-// claudeProjectDir returns ~/.claude/projects/<slug>, where slug is cwd with
-// every "/" replaced by "-". This is where claude persists one JSONL per
-// session for the project — the same path layout transcript.go reads from.
-func claudeProjectDir(cwd string) (string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(home, ".claude", "projects", projectSlug(cwd)), nil
-}
-
 // listClaudeSessions enumerates claude's per-project session files for cwd,
 // most-recently-modified first. The session ID is the filename stem; LastUsed
 // is the file mtime (claude rewrites the JSONL on every turn, so mtime tracks
@@ -69,7 +58,7 @@ func parseSessionHead(path string) (firstPrompt, model string) {
 	}
 	defer f.Close()
 	sc := bufio.NewScanner(f)
-	sc.Buffer(make([]byte, 0, 64*1024), 16*1024*1024)
+	sc.Buffer(make([]byte, 0, 64*1024), maxRecordBytes)
 	for sc.Scan() {
 		var rec struct {
 			Type    string `json:"type"`
@@ -86,7 +75,7 @@ func parseSessionHead(path string) (firstPrompt, model string) {
 			model = rec.Message.Model
 		}
 		if firstPrompt == "" && rec.Type == "user" && rec.Message.Role == "user" {
-			firstPrompt = extractUserText(rec.Message.Content)
+			firstPrompt = firstText(rec.Message.Content)
 		}
 		if firstPrompt != "" && model != "" {
 			return
@@ -95,24 +84,16 @@ func parseSessionHead(path string) (firstPrompt, model string) {
 	return
 }
 
-// extractUserText pulls the first non-empty user-typed text from a message's
-// content. Handles both encodings claude emits — a bare string, or an array
-// of typed content blocks — and skips non-text blocks (tool_result wrappers
-// also show up under type="user" but aren't what the human typed).
-func extractUserText(raw json.RawMessage) string {
-	var s string
-	if err := json.Unmarshal(raw, &s); err == nil && strings.TrimSpace(s) != "" {
-		return s
-	}
-	var arr []struct {
-		Type string `json:"type"`
-		Text string `json:"text"`
-	}
-	if err := json.Unmarshal(raw, &arr); err == nil {
-		for _, c := range arr {
-			if c.Type == "text" && strings.TrimSpace(c.Text) != "" {
-				return c.Text
-			}
+// firstText pulls the first non-empty user-typed text out of a message's
+// content, skipping non-text blocks (tool_result wrappers also show up under
+// type="user" but aren't what the human typed). Both of claude's content
+// encodings are handled by contentBlocks (transcript.go) — this and the
+// transcript replay must decode identically or the picker and the replay
+// disagree about which sessions have any conversation in them.
+func firstText(raw json.RawMessage) string {
+	for _, c := range contentBlocks(raw) {
+		if c.Type == "text" && strings.TrimSpace(c.Text) != "" {
+			return c.Text
 		}
 	}
 	return ""

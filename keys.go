@@ -215,6 +215,15 @@ func (m model) handleKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 		m.vp.ViewDown()
 		m.follow = m.vp.AtBottom()
 		return m, nil, true
+	// Shift+↑/↓ page by *prompt* — the same gesture at a coarser grain, for
+	// finding what you asked earlier (jump.go). Consumed either way so an
+	// unavailable step can't fall through into the textarea.
+	case "shift+up":
+		m.jumpPrompt(-1)
+		return m, nil, true
+	case "shift+down":
+		m.jumpPrompt(1)
+		return m, nil, true
 	}
 
 	// Shift+Tab cycles permission mode without restarting the subprocess.

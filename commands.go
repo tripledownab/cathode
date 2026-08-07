@@ -329,6 +329,7 @@ func helpText() string {
 	b.WriteString("  ?             open this help modal\n")
 	b.WriteString("  ↑ / ↓         history · cursor between lines (multi-line) · scroll (mouse off)\n")
 	b.WriteString("  ctrl+↑ / ↓    prompt history (always)\n")
+	b.WriteString("  shift+↑ / ↓   jump to your previous / next prompt in the transcript\n")
 	b.WriteString("  shift+scroll  drop into select mode (terminals that forward it; /mouse returns)\n")
 	b.WriteString("  esc           interrupt the running turn (or quit when idle)\n")
 	b.WriteString("  ctrl+c        interrupt the running turn · again to quit\n")

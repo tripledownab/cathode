@@ -23,6 +23,7 @@ func (m *model) rebuild() {
 	if m.cacheWidth != m.vp.Width || m.renderedCount > len(m.entries) {
 		m.content.Reset()
 		m.renderedCount = 0
+		m.entryLine, m.lineCount = m.entryLine[:0], 0
 		for _, e := range m.entries {
 			m.appendEntry(linkify(m.renderEntry(e)))
 		}
@@ -49,12 +50,18 @@ func (m *model) rebuild() {
 // before every entry after the first, then the render and a terminating
 // newline. This reproduces the old "join with \n\n plus a trailing \n" layout
 // while only touching the new tail.
+// It also records where the entry starts, which is what makes an entry index
+// addressable as a scroll offset (jump.go). The count is exact because every
+// renderer wraps to m.vp.Width, so one content line is one viewport line.
 func (m *model) appendEntry(s string) {
 	if m.renderedCount > 0 {
 		m.content.WriteString("\n")
+		m.lineCount++
 	}
+	m.entryLine = append(m.entryLine, m.lineCount)
 	m.content.WriteString(s)
 	m.content.WriteString("\n")
+	m.lineCount += strings.Count(s, "\n") + 1
 	m.renderedCount++
 }
 
