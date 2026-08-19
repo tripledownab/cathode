@@ -32,6 +32,10 @@ type Envelope struct {
 	CompactResult string `json:"compact_result"`
 	CompactError  string `json:"compact_error"`
 
+	// system/compact_boundary — the only place the CLI reports what a compaction
+	// actually did. Present on success only; see CompactMeta.
+	CompactMeta *CompactMeta `json:"compact_metadata"`
+
 	// system/hook_response fields — we surface only failing/blocking hooks.
 	HookName string `json:"hook_name"`
 	ExitCode int    `json:"exit_code"`
@@ -44,6 +48,32 @@ type Envelope struct {
 
 	// control_response-only (e.g. the reply to our initialize handshake)
 	Response *ControlResp `json:"response"`
+}
+
+// CompactMeta is the payload of a system/compact_boundary line: the real
+// numbers behind a completed compaction. It is an *outcome* report, not
+// progress — nothing at all is emitted between the "compacting" status and
+// this (verified against the CLI's event-yield switch and on the wire).
+//
+// Observed live (v2.1.220), arriving just *after* the success status:
+//
+//	{"type":"system","subtype":"compact_boundary","compact_metadata":{
+//	  "trigger":"manual","pre_tokens":22987,"post_tokens":1943,
+//	  "cumulative_dropped_tokens":21044,"duration_ms":33334, ...}}
+//
+// Note post_tokens is populated here but is absent from the compact_boundary
+// records persisted in claude's own session JSONL (0 of 234 locally) — the file
+// is written at the boundary point, before the post-compact size is known. Read
+// it from the stream, not from a replayed session.
+//
+// messages_summarized is documented by the CLI's mapper but doesn't always show
+// up, so every consumer treats each field as optional.
+type CompactMeta struct {
+	Trigger            string `json:"trigger"` // "manual" (a /compact) or "auto" (context filled up)
+	PreTokens          int    `json:"pre_tokens"`
+	PostTokens         int    `json:"post_tokens"`
+	DurationMS         int    `json:"duration_ms"`
+	MessagesSummarized int    `json:"messages_summarized"`
 }
 
 // ControlResp wraps a control_response line — the reply to a control_request we

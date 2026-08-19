@@ -24,9 +24,15 @@ func TestSettingsRoundTrip(t *testing.T) {
 		t.Fatalf("settings.json not written: %v", err)
 	}
 
+	// An all-empty file is also what a settings.json written before a field
+	// existed looks like — every field must fall back, not land on "".
 	saveSettings(settings{Header: ""})
-	if got := loadSettings(); got.Header != headerCyan {
+	got := loadSettings()
+	if got.Header != headerCyan {
 		t.Fatalf("empty Header should fall back to %q, got %q", headerCyan, got.Header)
+	}
+	if got.Bar != barComet {
+		t.Fatalf("settings.json predating the bar field should fall back to %q, got %q", barComet, got.Bar)
 	}
 }
 

@@ -43,16 +43,38 @@ func (m *model) handleEvent(e Envelope) {
 			// /compact streams these: "compacting" then a success/failed result.
 			switch {
 			case e.CompactResult == "success":
-				// The exact post-compact context size isn't reported here — it
-				// arrives with the next turn's usage. Zero the gauge now so it
-				// reflects the freeing immediately instead of staying stuck at the
-				// pre-compact level; observeCtx refines it on the next reply.
-				m.ctxTokens = 0
-				m.add(entInfo, "✓ context compacted")
+				m.stopCompacting()
+				// The compact_boundary carrying the real numbers may have landed
+				// first; if so, report those instead of the bare line.
+				line := compactDoneText
+				meta := m.compactMeta
+				if meta != nil {
+					line, m.compactMeta = compactSummary(*meta), nil
+				}
+				// Zeroing is a *placeholder* for the post-compact size, which this
+				// status doesn't carry — observeCtx refines it on the next reply.
+				// Don't apply it when a boundary already supplied the real figure
+				// (noteCompaction), or we'd throw away the better number.
+				if meta == nil || meta.PostTokens <= 0 {
+					m.ctxTokens = 0
+				}
+				m.add(entInfo, line)
 			case e.CompactResult == "failed":
+				m.stopCompacting()
 				m.add(entInfo, "✗ compact: "+e.CompactError)
 			case e.Status == "compacting":
+				// Raise the indeterminate progress bar (compact.go): compaction is
+				// the one operation that can sit silent for a minute, and the
+				// transcript line alone doesn't show it's still alive.
+				m.startCompacting()
 				m.add(entInfo, "→ compacting context…")
+			}
+		case "compact_boundary":
+			// Emitted on a successful compaction with what it actually did. The
+			// only real numbers the CLI gives us — everything during the run is
+			// silent (see compact.go).
+			if e.CompactMeta != nil {
+				m.noteCompaction(*e.CompactMeta)
 			}
 		}
 	case "assistant":
@@ -141,6 +163,9 @@ func (m *model) handleEvent(e Envelope) {
 		}
 	case "result":
 		m.busy = false
+		// Belt-and-braces: the turn is over, so the bar comes down even if the
+		// compact_result line never arrived (errored turn, killed subprocess).
+		m.stopCompacting()
 		m.lastCost = e.TotalCostUSD
 		// End of a silent /mcp prime: don't print the "— done —" line — just open
 		// the picker now that init has cached the server list (mcp.go).

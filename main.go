@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 	"syscall"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -97,6 +98,10 @@ func main() {
 		PermissionMode: modeToPermission(*mode),
 		MCPConfigPath:  *mcp,
 	}
+	// The user's standing instructions, when the toggle is on. This is a launch
+	// flag with no runtime equivalent, which is why /sysprompt restarts to
+	// change it (sysprompt.go).
+	cfg.ExtraArgs = append(cfg.ExtraArgs, sysPromptArgs(loadSettings().SysPrompt)...)
 	if *resume != "" {
 		// `--resume` is documented as `[value]` (optional value), which under
 		// Commander.js requires the `=` form — space-separated parses the id
@@ -136,7 +141,7 @@ func main() {
 		os.Exit(1)
 	}
 	if fm, ok := final.(model); ok && fm.resumeID != "" {
-		args := buildResumeArgv(os.Args, fm.resumeID)
+		args := buildResumeArgv(os.Args, fm.resumeID, fm.mode)
 		// syscall.Exec calls execve(2) directly — no $PATH lookup — so
 		// os.Args[0] (often the bare name "doorway") would resolve relative
 		// to cwd. From the repo root that hits the doorway/ subdirectory and
@@ -153,9 +158,31 @@ func main() {
 	}
 }
 
-// buildResumeArgv rebuilds an argv that resumes the given session, stripping
-// any -resume / --resume already present so the new ID wins cleanly.
-func buildResumeArgv(orig []string, id string) []string {
+// restartResuming asks main for a re-exec that comes back into the given
+// session. The single way to request a restart: main re-execs whenever the
+// final model carries a resumeID (see buildResumeArgv), and the caller must
+// return the Cmd.
+//
+// What survives is asymmetric, and worth knowing before adding a third caller:
+// claude reloads the *whole* session via --resume, so its context is intact,
+// but cathode's on-screen transcript is rehydrated from the session log and
+// capped at replayMax entries (model.go). A long scrollback is shortened by a
+// restart even though nothing was lost from the conversation itself.
+func (m *model) restartResuming(session string) tea.Cmd {
+	m.resumeID = session
+	return tea.Quit
+}
+
+// buildResumeArgv rebuilds an argv that resumes the given session in the given
+// mode, stripping any -resume / -mode already present so the new values win
+// cleanly.
+//
+// Mode is carried across because it's mutable in-session (Shift+Tab, keys.go)
+// while argv still holds whatever the process launched with. Without this a
+// re-exec silently drops you back to the launch mode — which mattered little
+// when only the session picker restarted, but /sysprompt made restarting a
+// routine act (sysprompt.go).
+func buildResumeArgv(orig []string, id, mode string) []string {
 	out := []string{orig[0]}
 	skipNext := false
 	for _, a := range orig[1:] {
@@ -163,11 +190,22 @@ func buildResumeArgv(orig []string, id string) []string {
 			skipNext = false
 			continue
 		}
-		if a == "-resume" || a == "--resume" {
+		switch a {
+		case "-resume", "--resume", "-mode", "--mode":
 			skipNext = true
+			continue
+		}
+		// The =-joined forms (-mode=plan) carry their value inline, so there's
+		// no following argument to skip.
+		if strings.HasPrefix(a, "-resume=") || strings.HasPrefix(a, "--resume=") ||
+			strings.HasPrefix(a, "-mode=") || strings.HasPrefix(a, "--mode=") {
 			continue
 		}
 		out = append(out, a)
 	}
-	return append(out, "-resume", id)
+	out = append(out, "-resume", id)
+	if mode != "" {
+		out = append(out, "-mode", mode)
+	}
+	return out
 }

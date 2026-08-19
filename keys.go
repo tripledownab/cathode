@@ -80,6 +80,18 @@ func (m model) handleKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 				m.commitSidebarPos(chosen)
 			}
 			return m, nil, true
+		case "bar":
+			if chosen != "" {
+				m.commitBar(chosen)
+			}
+			return m, nil, true
+		case "sysprompt":
+			// May return tea.Quit: applying it restarts into a resumed session
+			// (sysprompt.go).
+			if chosen != "" {
+				return m, m.commitSysPrompt(chosen), true
+			}
+			return m, nil, true
 		case "question":
 			// Answering an AskUserQuestion: a pick records the answer (and may open
 			// the next question); Esc (picker closed, no pick) dismisses it.
@@ -96,8 +108,7 @@ func (m model) handleKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 		}
 		switch kind {
 		case "sessions":
-			m.resumeID = chosen
-			return m, tea.Quit, true
+			return m, m.restartResuming(chosen), true
 		case "slash":
 			// Our commands run in-process; a claude / skill / plugin command from
 			// the merged palette isn't ours, so forward it like a typed turn.
@@ -145,6 +156,14 @@ func (m model) handleKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 			case "sidebarpos":
 				p := newPicker("sidebarpos", "SIDEBAR POSITION", sidebarPosItems(), m.w, m.h)
 				p.setCursorTo(m.settings.Sidebar)
+				m.picker = p
+			case "bar":
+				p := newPicker("bar", "COMPACT BAR", barItems(), m.w, m.h)
+				p.setCursorTo(m.settings.Bar)
+				m.picker = p
+			case "sysprompt":
+				p := newPicker("sysprompt", "EXTRA SYSTEM PROMPT", sysPromptItems(), m.w, m.h)
+				p.setCursorTo(sysPromptLabel(m.settings.SysPrompt))
 				m.picker = p
 			}
 			return m, nil, true
@@ -395,6 +414,7 @@ func (m model) interrupt() model {
 		m.add(entInfo, "✗ interrupted")
 	}
 	m.busy = false
+	m.stopCompacting()
 	return m
 }
 

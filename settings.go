@@ -106,6 +106,8 @@ func (m *model) settingsItems() []pickerItem {
 		{id: "theme", title: "color theme", subtitle: "current: " + themeLabel(m.settings.Theme)},
 		{id: "diff", title: "diff style", subtitle: "current: " + diffLabel(m.settings.Diff)},
 		{id: "sidebarpos", title: "sidebar position", subtitle: "current: " + sidebarLabel(m.settings.Sidebar)},
+		{id: "bar", title: "compact bar", subtitle: "current: " + barLabel(m.settings.Bar) + " · the /compact progress animation"},
+		{id: "sysprompt", title: "extra system prompt", subtitle: "current: " + sysPromptLabel(m.settings.SysPrompt) + " · restarts the session to apply"},
 	}
 }
 
@@ -137,10 +139,15 @@ type settings struct {
 	FPS     int    `json:"fps"`     // header animation frame rate; 0 → defaultFPS on load
 	Diff    string `json:"diff"`    // diff card style: "unified" or "split"
 	Sidebar string `json:"sidebar"` // info-rail side: "right" (default) or "left"
+	Bar     string `json:"bar"`     // /compact progress animation (compactstyle.go)
+	// SysPrompt toggles appending the user's own standing instructions to
+	// claude's system prompt. The text lives in its own file, not here — see
+	// sysprompt.go. Defaults to off: an appended prompt is opt-in.
+	SysPrompt bool `json:"sysprompt"`
 }
 
 func defaultSettings() settings {
-	return settings{Header: headerCyan, Theme: defaultTheme, FPS: defaultFPS, Diff: diffUnified, Sidebar: sidebarRight}
+	return settings{Header: headerCyan, Theme: defaultTheme, FPS: defaultFPS, Diff: diffUnified, Sidebar: sidebarRight, Bar: barComet}
 }
 
 // settingsPath mirrors sessionsPath/historyPath: $XDG_STATE_HOME/cathode, else
@@ -181,6 +188,9 @@ func loadSettings() settings {
 	}
 	if s.Sidebar == "" {
 		s.Sidebar = sidebarRight
+	}
+	if s.Bar == "" {
+		s.Bar = barComet
 	}
 	return s
 }

@@ -171,6 +171,7 @@ func buildStyles() {
 
 	buildSidebarStyles()
 	buildStatusStyles()
+	buildCompactStyles()
 }
 
 // colAccent is the scene-tag color (the "535510n" / wordmark divider tags and

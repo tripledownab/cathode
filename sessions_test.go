@@ -90,9 +90,9 @@ func TestSessionItemsFiltersByCwd(t *testing.T) {
 // TestBuildResumeArgvDropsExistingResume pins that re-exec doesn't accumulate
 // stale -resume flags when chaining picks across sessions.
 func TestBuildResumeArgvDropsExistingResume(t *testing.T) {
-	in := []string{"/bin/doorway", "-mode", "ask", "-resume", "old-id", "-spinner", "shade"}
-	out := buildResumeArgv(in, "new-id")
-	want := []string{"/bin/doorway", "-mode", "ask", "-spinner", "shade", "-resume", "new-id"}
+	in := []string{"/bin/cathode", "-mode", "ask", "-resume", "old-id", "-spinner", "shade"}
+	out := buildResumeArgv(in, "new-id", "ask")
+	want := []string{"/bin/cathode", "-spinner", "shade", "-resume", "new-id", "-mode", "ask"}
 	if !sameArgv(out, want) {
 		t.Fatalf("out = %v\nwant %v", out, want)
 	}
@@ -100,11 +100,30 @@ func TestBuildResumeArgvDropsExistingResume(t *testing.T) {
 
 // TestBuildResumeArgvAppendsWhenAbsent pins the first-time path.
 func TestBuildResumeArgvAppendsWhenAbsent(t *testing.T) {
-	in := []string{"/bin/doorway", "-mode", "ask"}
-	out := buildResumeArgv(in, "fresh-id")
-	want := []string{"/bin/doorway", "-mode", "ask", "-resume", "fresh-id"}
+	in := []string{"/bin/cathode", "-mode", "ask"}
+	out := buildResumeArgv(in, "fresh-id", "ask")
+	want := []string{"/bin/cathode", "-resume", "fresh-id", "-mode", "ask"}
 	if !sameArgv(out, want) {
 		t.Fatalf("out = %v\nwant %v", out, want)
+	}
+}
+
+// The mode is mutable in-session (Shift+Tab), so a re-exec must carry the live
+// one, not whatever argv launched with. Before this, toggling /sysprompt from
+// AUTO dropped you back to the launch mode without saying so.
+func TestBuildResumeArgvCarriesLiveMode(t *testing.T) {
+	in := []string{"/bin/cathode", "-mode", "ask", "-ctx", "1m"}
+	out := buildResumeArgv(in, "id", "build")
+	want := []string{"/bin/cathode", "-ctx", "1m", "-resume", "id", "-mode", "build"}
+	if !sameArgv(out, want) {
+		t.Fatalf("out = %v\nwant %v", out, want)
+	}
+	// The =-joined form has no separate value argument to skip; mishandling it
+	// would swallow the *next* unrelated flag.
+	eq := buildResumeArgv([]string{"/bin/cathode", "-mode=plan", "-spinner", "scan"}, "id", "build")
+	wantEq := []string{"/bin/cathode", "-spinner", "scan", "-resume", "id", "-mode", "build"}
+	if !sameArgv(eq, wantEq) {
+		t.Fatalf("=-form: out = %v\nwant %v", eq, wantEq)
 	}
 }
 

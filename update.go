@@ -65,8 +65,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case spinner.TickMsg:
 		// Only advance / re-arm while busy; idle, we let it lapse so the status
-		// spinner isn't repainting the whole screen for nothing.
-		if m.busy {
+		// spinner isn't repainting the whole screen for nothing. Compaction keeps
+		// it running too — it's the tick the progress bar animates off (compact.go).
+		if m.busy || m.compacting() {
 			var cmd tea.Cmd
 			m.sp, cmd = m.sp.Update(msg)
 			cmds = append(cmds, cmd)
@@ -144,6 +145,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case streamClosedMsg:
 		m.busy = false
+		m.stopCompacting()
 		note := "session ended"
 		if msg.err != nil {
 			note = "stream closed: " + msg.err.Error()
@@ -214,10 +216,11 @@ func (m *model) armHeaderIfNeeded() tea.Cmd {
 	return nil
 }
 
-// armSpinnerIfNeeded starts the status spinner tick when busy and none is in
-// flight, returning the Cmd (or nil). Idempotent via m.spinning.
+// armSpinnerIfNeeded starts the status spinner tick when busy (or compacting —
+// the compact bar animates off this tick rather than arming a second one) and
+// none is in flight, returning the Cmd (or nil). Idempotent via m.spinning.
 func (m *model) armSpinnerIfNeeded() tea.Cmd {
-	if m.busy && !m.spinning {
+	if (m.busy || m.compacting()) && !m.spinning {
 		m.spinning = true
 		return m.sp.Tick
 	}

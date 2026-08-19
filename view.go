@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/lipgloss"
 )
@@ -63,6 +64,13 @@ func (m model) renderBackground() string {
 		bbsBanner(m.w, m.colorPhase, m.headerStyle),
 		sceneDivider(leet("session"), m.w),
 		body,
+	}
+	// The compact bar sits between the transcript and the prompt while /compact
+	// runs — it animates every frame, so it stays out of the memoized body and
+	// out of the transcript (which caches its renders per entry). The spinner
+	// tick is what keeps frames coming; see compact.go.
+	if m.compacting() {
+		parts = append(parts, compactBar(m.w, time.Since(m.compactAt), m.sp.View(), m.settings.Bar, m.compactFrom))
 	}
 	parts = append(parts,
 		prompt,
