@@ -125,6 +125,42 @@ func slashCommands() []slashCmd {
 			},
 		},
 		{
+			name: "sysprompt",
+			desc: "toggle your standing instructions on claude's system prompt (on|off)",
+			exec: func(m *model, arg string) (model, tea.Cmd) {
+				switch id := strings.TrimSpace(strings.ToLower(arg)); id {
+				case sysPromptOn, sysPromptOff:
+					return *m, m.commitSysPrompt(id)
+				case "":
+					p := newPicker("sysprompt", "EXTRA SYSTEM PROMPT", sysPromptItems(), m.w, m.h)
+					p.setCursorTo(sysPromptLabel(m.settings.SysPrompt))
+					m.picker = p
+				default:
+					m.add(entError, "unknown option: "+id+" (on|off)")
+				}
+				return *m, nil
+			},
+		},
+		{
+			name: "bar",
+			desc: "/compact progress animation (comet|barber|pulse|scan|off)",
+			exec: func(m *model, arg string) (model, tea.Cmd) {
+				id := strings.TrimSpace(strings.ToLower(arg))
+				if id == "" {
+					p := newPicker("bar", "COMPACT BAR", barItems(), m.w, m.h)
+					p.setCursorTo(m.settings.Bar)
+					m.picker = p
+					return *m, nil
+				}
+				if !validBarStyle(id) {
+					m.add(entError, "unknown bar style: "+id+" (comet|barber|pulse|scan|off)")
+					return *m, nil
+				}
+				m.commitBar(id)
+				return *m, nil
+			},
+		},
+		{
 			name: "compact",
 			desc: "summarise older turns to free up context",
 			exec: func(m *model, _ string) (model, tea.Cmd) {

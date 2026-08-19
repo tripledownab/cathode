@@ -109,6 +109,16 @@ type model struct {
 	// left untouched overnight goes fully quiescent (no per-frame redraws / GC
 	// churn) and wakes on the next interaction. See shouldAnimateHeader.
 	lastActivity time.Time
+	// compactAt is when the "compacting" status arrived; zero when no compaction
+	// is running. Non-zero puts the indeterminate progress bar on screen and
+	// times it (compact.go).
+	compactAt time.Time
+	// compactMeta holds a compact_boundary's numbers when it arrived before the
+	// success status; the status handler prints them and clears it (compact.go).
+	compactMeta *CompactMeta
+	// compactFrom is ctxTokens as it stood when compaction began — the bar's
+	// duration hint is bucketed on it, and the gauge is zeroed mid-run.
+	compactFrom int
 	// ctrlCAt is when Ctrl+C was last pressed. The first press cancels the running
 	// turn (or, idle, does nothing) and arms an "again to exit" hint; a second
 	// press within ctrlCExitWindow quits. Zero means unarmed. See handleCtrlC.
@@ -159,7 +169,7 @@ type model struct {
 	ctxTokens int
 	outTokens int
 	ctxLimit  int
-	resumeID  string // picker selection; main.go reads after p.Run() and re-execs
+	resumeID  string // set via restartResuming (session picker, /sysprompt); main.go re-execs on it after p.Run()
 	ready     bool
 	w, h      int
 }

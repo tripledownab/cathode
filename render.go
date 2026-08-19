@@ -129,7 +129,8 @@ func (m *model) renderEntry(e entry) string {
 // the sidebar flag. Call after anything that changes those (window resize,
 // sidebar toggle, prompt height change).
 func (m *model) resizeViewport() {
-	vpH := m.h - 5 - m.promptRows() // banner(3) + divider(1) + status(1) + prompt
+	// banner(3) + divider(1) + status(1) + prompt + the compact bar when it's up
+	vpH := m.h - 5 - m.promptRows() - m.compactRows()
 	if vpH < 1 {
 		vpH = 1
 	}
