@@ -163,10 +163,25 @@ func TestCommitSysPrompt(t *testing.T) {
 		t.Error("setting should survive to disk")
 	}
 
-	// Selecting the state it's already in must not restart.
-	same := &model{session: "sess-1", settings: settings{SysPrompt: true}}
+	// Selecting the state it's already in, with the file unchanged since launch,
+	// must not restart — but it must still say so.
+	same := &model{session: "sess-1", settings: settings{SysPrompt: true}, sysPromptSeen: "Be terse."}
 	if cmd := same.commitSysPrompt(sysPromptOn); cmd != nil || same.resumeID != "" {
 		t.Error("re-selecting the current state should be a no-op, not a restart")
+	}
+	if len(same.entries) != 1 {
+		t.Fatalf("declining to restart must say why, got %d entries", len(same.entries))
+	}
+
+	// Same selection, but the file changed since launch. claude read it at
+	// launch, so re-selecting "on" is the only way to apply the edit.
+	writePrompt(t, "Be terse. Answer in one line.")
+	edited := &model{session: "sess-1", settings: settings{SysPrompt: true}, sysPromptSeen: "Be terse."}
+	if cmd := edited.commitSysPrompt(sysPromptOn); cmd == nil || edited.resumeID != "sess-1" {
+		t.Error("an edited prompt file should restart to reload it")
+	}
+	if !edited.settings.SysPrompt {
+		t.Error("reloading an edit must leave the toggle on")
 	}
 
 	// Mid-turn: persist, but don't kill the running turn.

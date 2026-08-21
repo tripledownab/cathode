@@ -107,7 +107,7 @@ func (m *model) settingsItems() []pickerItem {
 		{id: "diff", title: "diff style", subtitle: "current: " + diffLabel(m.settings.Diff)},
 		{id: "sidebarpos", title: "sidebar position", subtitle: "current: " + sidebarLabel(m.settings.Sidebar)},
 		{id: "bar", title: "compact bar", subtitle: "current: " + barLabel(m.settings.Bar) + " · the /compact progress animation"},
-		{id: "sysprompt", title: "extra system prompt", subtitle: "current: " + sysPromptLabel(m.settings.SysPrompt) + " · restarts the session to apply"},
+		{id: "sysprompt", title: "extra system prompt", subtitle: "current: " + sysPromptLabel(m.settings.SysPrompt) + sysPromptEditedNote(m.sysPromptEdited()) + " · restarts the session to apply"},
 	}
 }
 

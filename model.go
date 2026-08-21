@@ -151,6 +151,7 @@ type model struct {
 	bodyKey    bodyKey
 	contentVer int
 	toolUses   map[string]string // tool_use_id -> tool name, so tool_result events can show what they're answering
+	shownTools map[string]bool   // tool_use_ids already drawn as a card/diff, so the stream and approval paths don't both draw one (toolcard.go)
 	busy       bool
 	mode       string
 	session    string
@@ -170,8 +171,12 @@ type model struct {
 	outTokens int
 	ctxLimit  int
 	resumeID  string // set via restartResuming (session picker, /sysprompt); main.go re-execs on it after p.Run()
-	ready     bool
-	w, h      int
+	// sysPromptSeen is the appended prompt text as claude got it at launch, or
+	// "" when the toggle was off. The flag reads the file once, at startup, so
+	// this is what the live subprocess is running with (sysprompt.go).
+	sysPromptSeen string
+	ready         bool
+	w, h          int
 }
 
 // newPromptArea builds the multi-line prompt input. Single source of truth for
@@ -229,6 +234,11 @@ func newModel(e *Engine, mode string, a *Approvals, spin, resumeID string) model
 		follow:       true,
 		mouse:        true, // started with tea.WithMouseCellMotion in main.go
 		lastActivity: time.Now(),
+	}
+	// Record the prompt text this process launched with, so a later edit to the
+	// file is detectable (sysprompt.go:sysPromptEdited).
+	if st.SysPrompt {
+		m.sysPromptSeen = loadSysPrompt()
 	}
 	m.setPromptWidth(defW - 4)
 	m.makeRenderer()

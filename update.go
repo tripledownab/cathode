@@ -126,11 +126,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil // approvals waiter re-armed when the question is answered
 		}
 		// Surface what's being approved either way (so AUTO mode still shows
-		// a transcript record of what ran).
-		if ds, ok := diffsForTool(msg.req.toolName, msg.req.input); ok {
-			m.addDiffs(ds)
-		} else {
-			m.addTool(msg.req.toolName, msg.req.input)
+		// a transcript record of what ran) — unless the assistant event for
+		// this same tool_use already drew it (toolcard.go).
+		if m.noteToolCard(msg.req.toolUseID) {
+			if ds, ok := diffsForTool(msg.req.toolName, msg.req.input); ok {
+				m.addDiffs(ds)
+			} else {
+				m.addTool(msg.req.toolName, msg.req.input)
+			}
 		}
 		// AUTO (build) means "go autonomously" — short-circuit the approval
 		// instead of stalling on a y/n bar. acceptEdits alone only handles

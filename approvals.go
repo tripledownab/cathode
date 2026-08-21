@@ -29,10 +29,14 @@ type Approvals struct {
 }
 
 // approvalReq is one pending permission decision surfaced to the TUI.
+// toolUseID names the assistant tool_use block this decision is about; it pairs
+// the request with the stream event for the same call, so only one of the two
+// draws a transcript card (toolcard.go). It's empty if the client omits it.
 type approvalReq struct {
-	toolName string
-	input    json.RawMessage
-	reply    chan approvalReply
+	toolName  string
+	toolUseID string
+	input     json.RawMessage
+	reply     chan approvalReply
 }
 
 // approvalReply is the TUI's answer to an approvalReq. allow runs the tool;
@@ -192,8 +196,9 @@ func approveSchema() map[string]any {
 		"inputSchema": map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"tool_name": map[string]any{"type": "string"},
-				"input":     map[string]any{"type": "object"},
+				"tool_name":   map[string]any{"type": "string"},
+				"tool_use_id": map[string]any{"type": "string"},
+				"input":       map[string]any{"type": "object"},
 			},
 			"required": []string{"tool_name"},
 		},
@@ -206,14 +211,20 @@ func (a *Approvals) callTool(params json.RawMessage) map[string]any {
 	var p struct {
 		Name      string `json:"name"`
 		Arguments struct {
-			ToolName string          `json:"tool_name"`
-			Input    json.RawMessage `json:"input"`
+			ToolName  string          `json:"tool_name"`
+			ToolUseID string          `json:"tool_use_id"`
+			Input     json.RawMessage `json:"input"`
 		} `json:"arguments"`
 	}
 	_ = json.Unmarshal(params, &p)
 
 	reply := make(chan approvalReply, 1)
-	a.pending <- approvalReq{toolName: p.Arguments.ToolName, input: p.Arguments.Input, reply: reply}
+	a.pending <- approvalReq{
+		toolName:  p.Arguments.ToolName,
+		toolUseID: p.Arguments.ToolUseID,
+		input:     p.Arguments.Input,
+		reply:     reply,
+	}
 	d := <-reply
 
 	var decision string

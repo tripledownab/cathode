@@ -132,7 +132,7 @@ func slashCommands() []slashCmd {
 				case sysPromptOn, sysPromptOff:
 					return *m, m.commitSysPrompt(id)
 				case "":
-					p := newPicker("sysprompt", "EXTRA SYSTEM PROMPT", sysPromptItems(), m.w, m.h)
+					p := newPicker("sysprompt", "EXTRA SYSTEM PROMPT", sysPromptItems(m.sysPromptEdited()), m.w, m.h)
 					p.setCursorTo(sysPromptLabel(m.settings.SysPrompt))
 					m.picker = p
 				default:

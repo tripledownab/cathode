@@ -162,7 +162,7 @@ func (m model) handleKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 				p.setCursorTo(m.settings.Bar)
 				m.picker = p
 			case "sysprompt":
-				p := newPicker("sysprompt", "EXTRA SYSTEM PROMPT", sysPromptItems(), m.w, m.h)
+				p := newPicker("sysprompt", "EXTRA SYSTEM PROMPT", sysPromptItems(m.sysPromptEdited()), m.w, m.h)
 				p.setCursorTo(sysPromptLabel(m.settings.SysPrompt))
 				m.picker = p
 			}
