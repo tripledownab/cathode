@@ -118,6 +118,11 @@ func (m *model) handleEvent(e Envelope) {
 				if b.Name == askUserQuestionTool {
 					continue
 				}
+				// The approval request for this same call draws a card too;
+				// whichever arrives first wins and the other skips (toolcard.go).
+				if !m.noteToolCard(b.ID) {
+					continue
+				}
 				if ds, ok := diffsForTool(b.Name, b.Input); ok {
 					m.addDiffs(ds)
 				} else {
