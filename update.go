@@ -1,0 +1,234 @@
+// Copyright 2026 Triple Down AB
+// SPDX-License-Identifier: Apache-2.0
+
+package main
+
+import (
+	"time"
+
+	"github.com/charmbracelet/bubbles/spinner"
+	tea "github.com/charmbracelet/bubbletea"
+)
+
+// Update is the Bubble Tea dispatcher. Most of the heavy lifting lives in
+// per-msg helpers; this stays a small router. Keys go through handleKey
+// (keys.go); stream envelopes through handleEvent (stream.go); the rest is
+// inlined because it's one statement each.
+func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmds []tea.Cmd
+
+	// Mark genuine activity (input or new output) so the idle-pausing header
+	// animation knows the screen is live. The recurring ticks (header / spinner
+	// / splash / cursor-blink) are deliberately excluded — counting them would
+	// mean an untouched screen never goes quiet.
+	switch msg.(type) {
+	case tea.KeyMsg, tea.MouseMsg, tea.WindowSizeMsg, streamMsg, pendingApprovalMsg, streamClosedMsg:
+		m.lastActivity = time.Now()
+	}
+
+	switch msg := msg.(type) {
+
+	case tea.WindowSizeMsg:
+		m.w, m.h = msg.Width, msg.Height
+		m.setPromptWidth(msg.Width - 4)
+		m.resizeViewport()
+		m.makeRenderer()
+		m.rebuild()
+
+	case tea.MouseMsg:
+		// Shift+wheel is the terminal's native "let me select text" gesture. In the
+		// terminals that forward it to us (many grab it for their own scrollback and
+		// never do), take it as a shortcut into select mode — the same state /mouse
+		// off reaches. Only fires while capture is on; once off we stop receiving
+		// mouse events, so it's inherently one-way (run /mouse to come back).
+		if m.mouse && msg.Shift && tea.MouseEvent(msg).IsWheel() {
+			cmd := m.setMouseCapture(false)
+			m.refreshBody()
+			return m, tea.Batch(cmd, m.armHeaderIfNeeded())
+		}
+
+	case tea.KeyMsg:
+		prevOff := m.vp.YOffset
+		nm, cmd, handled := m.handleKey(msg)
+		if handled {
+			// Handled keys return early, bypassing the tail below. Resize the prompt
+			// (a handled key may have changed its line count), refresh the body (it
+			// may have scrolled or added an entry), and re-wake the header (the key
+			// counted as activity). All no-op when nothing changed.
+			nm.syncPromptHeight()
+			// PageUp/Down (or ↑/↓ in select mode) may have scrolled — surface the
+			// scrollbar so the user sees where they are, then let it auto-hide.
+			if nm.vp.YOffset != prevOff {
+				cmd = tea.Batch(cmd, nm.pokeScrollbar())
+			}
+			nm.refreshBody()
+			return nm, tea.Batch(cmd, nm.armHeaderIfNeeded())
+		}
+		m = nm
+
+	case spinner.TickMsg:
+		// Only advance / re-arm while busy; idle, we let it lapse so the status
+		// spinner isn't repainting the whole screen for nothing. Compaction keeps
+		// it running too — it's the tick the progress bar animates off (compact.go).
+		if m.busy || m.compacting() {
+			var cmd tea.Cmd
+			m.sp, cmd = m.sp.Update(msg)
+			cmds = append(cmds, cmd)
+		} else {
+			m.spinning = false
+		}
+
+	case rainbowTickMsg:
+		// Drift the header band and re-arm at the configured fps — but only while
+		// it actually animates (style not "off", fps > 0, splash gone). Otherwise
+		// stop, so an idle screen quits redrawing.
+		if m.shouldAnimateHeader() {
+			m.colorPhase++
+			cmds = append(cmds, rainbowTick(m.settings.FPS))
+		} else {
+			m.animating = false
+		}
+
+	case splashTickMsg:
+		// Once the splash is dismissed (or fully revealed) we stop re-arming
+		// the tick so the runtime isn't woken up for no reason.
+		if !m.splash || m.splashFrame >= splashFinalFrame {
+			return m, nil
+		}
+		m.splashFrame++
+		return m, splashTick()
+
+	case scrollHideMsg:
+		// The visibility window may have been extended by a later scroll: re-arm
+		// for the remainder, else let it lapse and fall through to the tail, where
+		// refreshBody re-renders the column blank.
+		if remaining := scrollbarHideAfter - time.Since(m.scrollShownAt); remaining > 0 {
+			cmds = append(cmds, scrollHideTick(remaining))
+		} else {
+			m.scrollTicking = false
+		}
+
+	case ctrlCHintMsg:
+		// The exit window lapsed: clear the arm so the status drops the "again to
+		// exit" hint on this frame. Guarded so a newer Ctrl+C that re-armed within
+		// the window isn't cleared by an older tick.
+		if !m.ctrlCArmed() {
+			m.ctrlCAt = time.Time{}
+		}
+
+	case streamMsg:
+		m.handleEvent(msg.env)
+
+	case pendingApprovalMsg:
+		// AskUserQuestion is a question, not a permission. Always present it — even
+		// in build/bypass, and never auto-approve — and answer it via the picker
+		// (see question.go / keys.go); the reply carries the chosen answer.
+		if q, ok := parseAskQuestion(msg.req); ok {
+			m.question = q
+			m.picker = q.picker(m.w, m.h)
+			return m, nil // approvals waiter re-armed when the question is answered
+		}
+		// Surface what's being approved either way (so AUTO mode still shows
+		// a transcript record of what ran) — unless the assistant event for
+		// this same tool_use already drew it (toolcard.go).
+		if m.noteToolCard(msg.req.toolUseID) {
+			if ds, ok := diffsForTool(msg.req.toolName, msg.req.input); ok {
+				m.addDiffs(ds)
+			} else {
+				m.addTool(msg.req.toolName, msg.req.input)
+			}
+		}
+		// AUTO (build) means "go autonomously" — short-circuit the approval
+		// instead of stalling on a y/n bar. acceptEdits alone only handles
+		// file edits; this extends it to bash, grep, fetch, etc.
+		if m.mode == "build" {
+			msg.req.reply <- approvalReply{allow: true}
+			m.add(entInfo, "✓ auto-approved "+msg.req.toolName)
+			m.refreshBody() // early return — keep the cached body current
+			return m, waitApproval(m.approvals)
+		}
+		m.pending = &msg.req
+
+	case streamClosedMsg:
+		m.busy = false
+		m.stopCompacting()
+		note := "session ended"
+		if msg.err != nil {
+			note = "stream closed: " + msg.err.Error()
+		}
+		m.add(entInfo, "— "+note+" —")
+	}
+
+	prevInput := m.input.Value()
+	prevOff := m.vp.YOffset
+	var cmd tea.Cmd
+	m.input, cmd = m.input.Update(msg)
+	cmds = append(cmds, cmd)
+	// Reconcile the inline @-file menu with the prompt after the textarea has
+	// applied the key. Only on typed input (which may open/change it) or while
+	// it's already open — stream events don't touch the prompt (complete.go).
+	if _, isKey := msg.(tea.KeyMsg); isKey || m.comp != nil {
+		m.syncCompletion()
+	}
+	m.vp, cmd = m.vp.Update(msg)
+	cmds = append(cmds, cmd)
+	// A wheel scroll moved the viewport here (keys are handled above; streaming
+	// scrolls via rebuild's GotoBottom, not this path), so this only fires on a
+	// genuine user gesture — surface the scrollbar and let it auto-hide.
+	if m.vp.YOffset != prevOff {
+		if c := m.pokeScrollbar(); c != nil {
+			cmds = append(cmds, c)
+		}
+	}
+	m.syncScroll(msg, prevInput)
+	// Grow/shrink the prompt to fit its line count (resizes the viewport when it
+	// changes), then recompute the memoized transcript body if its inputs changed
+	// (a no-op on the common typing / animation frames).
+	m.syncPromptHeight()
+	m.refreshBody()
+	// Arm the animation ticks if they should be running and aren't yet. Handlers
+	// that return early (handled keys) arm them directly, so this only has to
+	// catch the fall-through paths (stream events, resize, the ticks themselves).
+	if c := m.armHeaderIfNeeded(); c != nil {
+		cmds = append(cmds, c)
+	}
+	if c := m.armSpinnerIfNeeded(); c != nil {
+		cmds = append(cmds, c)
+	}
+	return m, tea.Batch(cmds...)
+}
+
+// headerIdleAfter is how long with no key/mouse/output before the header
+// animation pauses itself. A session left untouched (e.g. overnight) then stops
+// repainting entirely — no per-frame work or allocation churn — and the next
+// keypress, scroll, or stream event wakes it via the activity stamp in Update.
+const headerIdleAfter = 45 * time.Second
+
+// shouldAnimateHeader reports whether the header wordmark's color tick should be
+// running: past the splash, an animated style, a positive fps, and recent
+// activity (so an idle screen goes quiet instead of redrawing forever).
+func (m *model) shouldAnimateHeader() bool {
+	return !m.splash && m.headerStyle != headerOff && m.settings.FPS > 0 &&
+		time.Since(m.lastActivity) < headerIdleAfter
+}
+
+// armHeaderIfNeeded starts the header color tick when it should animate but none
+// is in flight, returning the Cmd (or nil). Idempotent via m.animating.
+func (m *model) armHeaderIfNeeded() tea.Cmd {
+	if m.shouldAnimateHeader() && !m.animating {
+		m.animating = true
+		return rainbowTick(m.settings.FPS)
+	}
+	return nil
+}
+
+// armSpinnerIfNeeded starts the status spinner tick when busy (or compacting —
+// the compact bar animates off this tick rather than arming a second one) and
+// none is in flight, returning the Cmd (or nil). Idempotent via m.spinning.
+func (m *model) armSpinnerIfNeeded() tea.Cmd {
+	if (m.busy || m.compacting()) && !m.spinning {
+		m.spinning = true
+		return m.sp.Tick
+	}
+	return nil
+}

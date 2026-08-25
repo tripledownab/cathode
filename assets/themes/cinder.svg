@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1060" height="367" viewBox="0 0 1060 367">
+<rect width="1060" height="367" fill="#0F0F0F"/>
+<text x="16.0" y="30.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
+<tspan x="16.0" fill="#e8853a" font-weight="400">║</tspan>
+<tspan x="34.2" fill="#e8853a" font-weight="700">▪ YoU</tspan>
+</text>
+<text x="16.0" y="49.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
+<tspan x="16.0" fill="#e8853a" font-weight="400">║</tspan>
+<tspan x="25.1" fill="#EDEDED" font-weight="400"> refactor add() to take a third arg and update the caller                                  </tspan>
+</text>
+<text x="16.0" y="68.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
+</text>
+<text x="16.0" y="87.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
+<tspan x="16.0" fill="#9e9e9e" font-weight="700">▪ ClAuDe</tspan>
+</text>
+<text x="16.0" y="106.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
+<tspan x="16.0" fill="#EDEDED" font-weight="400">Here's the change to both the function and its caller:                                      </tspan>
+</text>
+<text x="16.0" y="125.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
+</text>
+<text x="16.0" y="144.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
+<tspan x="16.0" fill="#9e9e9e" font-weight="400">╔═════════════════════════════════════════════════════════════════════════════════════════╗</tspan>
+</text>
+<text x="16.0" y="163.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
+<tspan x="16.0" fill="#9e9e9e" font-weight="400">║</tspan>
+<tspan x="34.2" fill="#ededed" font-weight="700"> math.go  </tspan>
+<tspan x="125.2" fill="#77a06e" font-weight="700">+2</tspan>
+<tspan x="152.5" fill="#de5068" font-weight="400">-2</tspan>
+<tspan x="835.0" fill="#9e9e9e" font-weight="400">║</tspan>
+</text>
+<text x="16.0" y="182.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
+<tspan x="16.0" fill="#9e9e9e" font-weight="400">║</tspan>
+<tspan x="25.1" fill="#808080" font-weight="400">         │ </tspan>
+<tspan x="125.2" fill="#9e9e9e" font-weight="400">@@ -1,3 +1,3 @@</tspan>
+<tspan x="835.0" fill="#9e9e9e" font-weight="400">║</tspan>
+</text>
+<text x="16.0" y="201.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
+<tspan x="16.0" fill="#9e9e9e" font-weight="400">║</tspan>
+<tspan x="25.1" fill="#808080" font-weight="400">   1     │ </tspan>
+<tspan x="125.2" fill="#de5068" font-weight="400">- func add(a, b int) int {</tspan>
+<tspan x="835.0" fill="#9e9e9e" font-weight="400">║</tspan>
+</text>
+<text x="16.0" y="220.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
+<tspan x="16.0" fill="#9e9e9e" font-weight="400">║</tspan>
+<tspan x="25.1" fill="#808080" font-weight="400">        1│ </tspan>
+<tspan x="125.2" fill="#77a06e" font-weight="400">+ func add(a, b, c int) int {</tspan>
+<tspan x="835.0" fill="#9e9e9e" font-weight="400">║</tspan>
+</text>
+<text x="16.0" y="239.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
+<tspan x="16.0" fill="#9e9e9e" font-weight="400">║</tspan>
+<tspan x="25.1" fill="#808080" font-weight="400">   2     │ </tspan>
+<tspan x="125.2" fill="#de5068" font-weight="400">-   return a + b</tspan>
+<tspan x="835.0" fill="#9e9e9e" font-weight="400">║</tspan>
+</text>
+<text x="16.0" y="258.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
+<tspan x="16.0" fill="#9e9e9e" font-weight="400">║</tspan>
+<tspan x="25.1" fill="#808080" font-weight="400">        2│ </tspan>
+<tspan x="125.2" fill="#77a06e" font-weight="400">+   return a + b + c</tspan>
+<tspan x="835.0" fill="#9e9e9e" font-weight="400">║</tspan>
+</text>
+<text x="16.0" y="277.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
+<tspan x="16.0" fill="#9e9e9e" font-weight="400">║</tspan>
+<tspan x="25.1" fill="#808080" font-weight="400">   3    3│ </tspan>
+<tspan x="125.2" fill="#787878" font-weight="400">  }</tspan>
+<tspan x="835.0" fill="#9e9e9e" font-weight="400">║</tspan>
+</text>
+<text x="16.0" y="296.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
+<tspan x="16.0" fill="#9e9e9e" font-weight="400">╚═════════════════════════════════════════════════════════════════════════════════════════╝</tspan>
+</text>
+<text x="16.0" y="315.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
+</text>
+<rect x="16.0" y="320.0" width="9.1" height="19.0" fill="#a83a1c"/>
+<rect x="25.1" y="320.0" width="618.8" height="19.0" fill="#a83a1c"/>
+<rect x="643.9" y="320.0" width="9.1" height="19.0" fill="#a83a1c"/>
+<text x="16.0" y="334.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
+<tspan x="25.1" fill="#ededed" font-weight="700"> ►◄ ClAuDe WaNtS:  EDIT    [ENTER] 4LL0W (default)    [ESC] D3NY ◄► </tspan>
+</text>
+<text x="16.0" y="353.0" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace" font-size="15" xml:space="preserve">
+<tspan x="25.1" fill="#787878" font-weight="400">MDL</tspan>
+<tspan x="61.5" fill="#ededed" font-weight="400">sonnet</tspan>
+<tspan x="116.1" fill="#787878" font-weight="400"> ▪ </tspan>
+<tspan x="143.4" fill="#787878" font-weight="400">M0D3</tspan>
+<tspan x="188.9" fill="#ededed" font-weight="400">EDIT</tspan>
+<tspan x="225.3" fill="#787878" font-weight="400"> ▪ </tspan>
+<tspan x="252.6" fill="#787878" font-weight="400">N0D3</tspan>
+<tspan x="298.1" fill="#ededed" font-weight="400">a1b2c3d4</tspan>
+<tspan x="370.9" fill="#787878" font-weight="400"> ▪ </tspan>
+<tspan x="398.2" fill="#787878" font-weight="400">BR</tspan>
+<tspan x="425.5" fill="#ededed" font-weight="400">main</tspan>
+<tspan x="461.9" fill="#787878" font-weight="400"> ▪ </tspan>
+<tspan x="489.2" fill="#787878" font-weight="400">CTX</tspan>
+<tspan x="525.6" fill="#ededed" font-weight="400">24.0K</tspan>
+<tspan x="580.2" fill="#787878" font-weight="400">░░░░░░░░</tspan>
+<tspan x="662.1" fill="#ededed" font-weight="400">12%</tspan>
+<tspan x="689.4" fill="#787878" font-weight="400"> ▪ </tspan>
+<tspan x="716.7" fill="#787878" font-weight="400">OUT</tspan>
+<tspan x="753.1" fill="#ededed" font-weight="400">1.2K</tspan>
+<tspan x="789.5" fill="#787878" font-weight="400"> ▪ </tspan>
+<tspan x="816.8" fill="#ededed" font-weight="400">$0.0042</tspan>
+<tspan x="880.5" fill="#787878" font-weight="400"> ▪ </tspan>
+<tspan x="907.8" fill="#f05928" font-weight="700">[█▒▒▒] W0RK1NG</tspan>
+</text>
+</svg>

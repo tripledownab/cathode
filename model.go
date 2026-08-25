@@ -1,0 +1,341 @@
+// Copyright 2026 Triple Down AB
+// SPDX-License-Identifier: Apache-2.0
+
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/bubbles/textarea"
+	"github.com/charmbracelet/bubbles/viewport"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/glamour"
+	"github.com/charmbracelet/lipgloss"
+)
+
+// entryKind tags one item in the transcript so rebuild() can dispatch to the
+// right renderer. We keep raw text/data per entry and re-render on resize so
+// markdown re-wraps to the new width.
+type entryKind int
+
+const (
+	entUser entryKind = iota
+	entClaude
+	entThinking
+	entTool
+	entToolResult
+	entDiff
+	entInfo
+	entError
+)
+
+type entry struct {
+	kind       entryKind
+	text       string          // user/claude: raw; tool fallback: "name\ninput"; info/error: plain
+	diffs      []fileDiff      // entDiff only; rendered at current width on rebuild
+	toolName   string          // entTool / entToolResult: resolved tool name (may be "")
+	toolInput  json.RawMessage // entTool only; raw tool_use input JSON
+	toolResult string          // entToolResult only; flattened result body
+	toolError  bool            // entToolResult only; true if the tool reported an error
+}
+
+// bodyKey is every input the composed transcript body depends on. While it's
+// unchanged (e.g. typing into the prompt, or the header animating) the cached
+// frameBody is reused instead of re-styling the whole viewport each frame.
+type bodyKey struct {
+	ver, w, h, off, mw int
+	sidebar            bool
+	sidePos            string
+	mode, sess, mid    string
+	cost               float64
+	sbVisible          bool // scrollbar showing glyphs vs auto-hidden (blank) — see scroll.go
+}
+
+// model is the Bubble Tea model. Field grouping mirrors the lifecycle:
+// external services up top, modal flags, widgets, then session/turn state.
+type model struct {
+	engine    *Engine
+	approvals *Approvals
+	md        *glamour.TermRenderer
+	hist      *history
+	sessions  *sessionStore
+
+	pending  *approvalReq     // non-nil while awaiting a y/n decision
+	question *pendingQuestion // non-nil while answering an AskUserQuestion
+	picker   *picker          // non-nil while a picker dialog is open
+	comp     *completion      // non-nil while the inline @-file menu is open (complete.go)
+	// compDismissed suppresses reopening the @-menu after Esc until the cursor
+	// leaves the current token, so Esc is a real "let me type it myself" escape.
+	compDismissed bool
+	splash        bool // true until the first keypress dismisses the boot screen
+	splashFrame   int  // current animation frame; clamps at splashFinalFrame
+	logoIdx       int  // which splash wordmark variant this launch shows (picked once)
+	colorPhase    int  // monotonic counter driving the header wordmark's rainbow sweep
+	sidebar       bool // true to render the BBS info rail (auto-hidden on narrow terms)
+	help          bool // true while the help modal is up; Esc dismisses
+	mouse         bool // mouse capture on (wheel scroll) vs off (terminal-native select/copy)
+
+	settings    settings // persisted user config (see settings.go)
+	headerStyle string   // live header animation id; previewed in /settings, committed to settings.Header
+
+	vp    viewport.Model
+	input textarea.Model
+	// promptW is the total width last given to the input (setPromptWidth), kept
+	// so syncPromptHeight can derive the inner wrap width for soft-wrap sizing.
+	// lastPromptRows is the visual row count after the previous sync, used to
+	// detect re-entry from over-the-cap so the scroll can be re-anchored.
+	promptW        int
+	lastPromptRows int
+	sp             spinner.Model
+	// follow pins the transcript to the latest line while Claude streams;
+	// cleared when the user scrolls up to read back (see scroll.go).
+	follow bool
+	// scrollShownAt is when the user last scrolled the transcript. The right-edge
+	// scrollbar shows its │/┃ glyphs only for scrollbarHideAfter past it, then
+	// blanks to spaces — so drag-selecting to copy doesn't drag a column of pipes
+	// into the clipboard. scrollTicking guards the one hide tick in flight
+	// (mirrors animating/spinning). See scroll.go.
+	scrollShownAt time.Time
+	scrollTicking bool
+	// animating/spinning track whether a header / spinner tick is already in
+	// flight, so exactly one is armed and an idle screen (static header, not
+	// busy) stops redrawing instead of waking the runtime many times a second.
+	animating bool
+	spinning  bool
+	// lastActivity is when the user last did something (key/mouse) or new output
+	// arrived. The header animation pauses headerIdleAfter past it so a session
+	// left untouched overnight goes fully quiescent (no per-frame redraws / GC
+	// churn) and wakes on the next interaction. See shouldAnimateHeader.
+	lastActivity time.Time
+	// compactAt is when the "compacting" status arrived; zero when no compaction
+	// is running. Non-zero puts the indeterminate progress bar on screen and
+	// times it (compact.go).
+	compactAt time.Time
+	// compactMeta holds a compact_boundary's numbers when it arrived before the
+	// success status; the status handler prints them and clears it (compact.go).
+	compactMeta *CompactMeta
+	// compactFrom is ctxTokens as it stood when compaction began — the bar's
+	// duration hint is bucketed on it, and the gauge is zeroed mid-run.
+	compactFrom int
+	// ctrlCAt is when Ctrl+C was last pressed. The first press clears the prompt
+	// and cancels the running turn (or, idle with an empty prompt, does nothing)
+	// and arms an "again to exit" hint; a second press within ctrlCExitWindow
+	// quits. Zero means unarmed. See handleCtrlC.
+	ctrlCAt time.Time
+
+	entries []entry
+	// content accumulates the rendered transcript so each new entry is appended
+	// to it (O(new)) rather than re-joining every entry's render into a fresh
+	// string each message (which was O(total) per message — see rebuild). It's a
+	// pointer because the model is copied by value every Update and a
+	// strings.Builder must not be copied after use; every copy shares the one
+	// buffer, which is safe since only the Update loop (single timeline) writes
+	// it. renderedCount is how many entries are already in the buffer; cacheWidth
+	// is the wrap width they were rendered at (a width change forces a full
+	// re-render so markdown/diffs reflow).
+	content       *strings.Builder
+	renderedCount int
+	cacheWidth    int
+	// entryLine[i] is the content line entry i starts on; lineCount is how many
+	// lines are in the buffer so far. Both are maintained by appendEntry and
+	// cleared with the buffer, so they can't drift from what the viewport shows.
+	// jump.go uses them to scroll a chosen prompt to the top (shift+↑/↓).
+	entryLine []int
+	lineCount int
+	// frameBody memoizes the composed transcript body (viewport + scrollbar +
+	// sidebar) — ~80% of a frame's cost, and identical between frames while you
+	// type or the wordmark shimmers. refreshBody (update.go) rebuilds it only
+	// when bodyKey changes; contentVer bumps whenever the viewport content does.
+	frameBody  string
+	bodyKey    bodyKey
+	contentVer int
+	toolUses   map[string]string // tool_use_id -> tool name, so tool_result events can show what they're answering
+	shownTools map[string]bool   // tool_use_ids already drawn as a card/diff, so the stream and approval paths don't both draw one (toolcard.go)
+	busy       bool
+	mode       string
+	session    string
+	modelID    string
+	models     []ModelChoice   // model menu from the initialize handshake; drives /model (see models.go)
+	commands   []CommandInfo   // command list from the handshake; merged into the palette (built-ins + skills + plugins)
+	agents     []AgentInfo     // subagent list from the handshake; shown by /agents
+	mcpServers []MCPServerInfo // MCP servers + status from system:init; drives /mcp (see mcp.go)
+	mcpPriming bool            // true while a silent /mcp fetch is in flight; its echo is swallowed and the picker opens on result (mcp.go)
+	lastCost   float64
+	// Running token totals across the session. ctxTokens is the most recent
+	// turn's "live" context size (input + cache_read + cache_creation), which
+	// is what drives the context-pressure gauge in the status bar. outTokens
+	// is cumulative. ctxLimit defaults to 200K and auto-grows when observed
+	// ctx exceeds it, so users on the 1M-context beta don't see a stuck ⚠.
+	ctxTokens int
+	outTokens int
+	ctxLimit  int
+	resumeID  string // set via restartResuming (session picker, /sysprompt); main.go re-execs on it after p.Run()
+	// sysPromptSeen is the appended prompt text as claude got it at launch, or
+	// "" when the toggle was off. The flag reads the file once, at startup, so
+	// this is what the live subprocess is running with (sysprompt.go).
+	sysPromptSeen string
+	ready         bool
+	w, h          int
+}
+
+// newPromptArea builds the multi-line prompt input. Single source of truth for
+// its config so tests exercise the real keymap: Enter is reserved for sending
+// (handled in handleEnter), so the textarea's newline binding is rebound to
+// alt+enter / ctrl+j (plus a trailing "\" + enter — see handleEnter).
+func newPromptArea() textarea.Model {
+	ta := textarea.New()
+	ta.Placeholder = "Ask Claude…  (enter sends · alt+enter / ctrl+j / \\↵ for a new line)"
+	ta.Prompt = "› "
+	ta.CharLimit = 0
+	ta.ShowLineNumbers = false
+	ta.FocusedStyle.CursorLine = lipgloss.NewStyle() // no current-line highlight bar
+	ta.KeyMap.InsertNewline = key.NewBinding(key.WithKeys("alt+enter", "ctrl+j"))
+	ta.SetHeight(1)
+	return ta
+}
+
+// setPromptWidth sizes the input and records the width so syncPromptHeight
+// (render.go) can compute the inner wrap width for soft-wrap row counting.
+func (m *model) setPromptWidth(w int) {
+	m.promptW = w
+	m.input.SetWidth(w)
+}
+
+func newModel(e *Engine, mode string, a *Approvals, spin, resumeID string) model {
+	ta := newPromptArea()
+	ta.Focus()
+
+	sp := spinner.New()
+	sp.Spinner = bbsSpinner(spin)
+
+	// Seed a sensible default size so the splash (and the rest of the UI)
+	// renders on the very first frame. If the initial tea.WindowSizeMsg
+	// arrives late or never — which produced the original "starting…" hang on
+	// first launch — we still paint, then reflow on the next resize.
+	const defW, defH = 80, 24
+	st := loadSettings()
+	applyTheme(st.Theme) // re-skin all styles to the persisted theme before first paint
+	m := model{
+		engine: e, approvals: a,
+		hist:     openHistory(),
+		sessions: openSessionStore(),
+		input:    ta, sp: sp,
+		settings: st, headerStyle: st.Header,
+		mode: mode, splash: true,
+		// Start at frame 1 so the wordmark is visible on the first paint;
+		// without this the user sees ~140ms of blank screen before the first
+		// splash tick fires.
+		splashFrame: 1,
+		logoIdx:     pickLogoIdx(),
+		w:           defW, h: defH,
+		vp:           newTranscriptViewport(defW, defH-6),
+		ready:        true,
+		follow:       true,
+		mouse:        true, // started with tea.WithMouseCellMotion in main.go
+		lastActivity: time.Now(),
+	}
+	// Record the prompt text this process launched with, so a later edit to the
+	// file is detectable (sysprompt.go:sysPromptEdited).
+	if st.SysPrompt {
+		m.sysPromptSeen = loadSysPrompt()
+	}
+	m.setPromptWidth(defW - 4)
+	m.makeRenderer()
+	// On resume, replay the last N turns from claude's own JSONL so the
+	// transcript isn't empty after re-exec. claude itself loads the session
+	// into context — this is purely a visual rehydrate.
+	if resumeID != "" {
+		// Skip the boot splash: the user already picked the session, so drop
+		// them straight back into the transcript.
+		m.splash = false
+		const replayMax = 40
+		prior, ctxTok := loadPriorTranscript(resumeID, replayMax)
+		if len(prior) > 0 {
+			m.entries = append(m.entries, entry{kind: entInfo, text: fmt.Sprintf("— resumed · replaying last %d entries —", len(prior))})
+			m.entries = append(m.entries, prior...)
+		}
+		// Seed the context gauge from the resumed session's last turn so it
+		// reflects real usage immediately instead of 0% (limit grown in
+		// main.go once the -ctx flag is applied).
+		m.ctxTokens = ctxTok
+	}
+	return m
+}
+
+// observeCtx records the live context size and snaps ctxLimit up past it
+// (200K → 500K → 1M → 2M …) so users on the long-context beta never see a
+// stuck gauge. Shared by the per-turn usage path (stream.go) and the resume
+// seed (main.go, after the -ctx flag sets the initial limit).
+func (m *model) observeCtx(tokens int) {
+	m.ctxTokens = tokens
+	for m.ctxLimit > 0 && m.ctxTokens > m.ctxLimit {
+		m.ctxLimit = nextCtxTier(m.ctxLimit)
+	}
+}
+
+func (m model) Init() tea.Cmd {
+	// The spinner and header ticks are armed lazily (only while busy / while the
+	// header animates) so an idle screen stops redrawing — see armSpinnerIfNeeded
+	// and armHeaderIfNeeded in update.go.
+	cmds := []tea.Cmd{m.input.Focus(), splashTick(), requestModels(m.engine)}
+	if m.approvals != nil {
+		cmds = append(cmds, waitApproval(m.approvals))
+	}
+	return tea.Batch(cmds...)
+}
+
+// makeRenderer builds a glamour renderer sized to the current width. Borrowed
+// from how OpenCode/Crush render assistant output as styled markdown.
+func (m *model) makeRenderer() {
+	w := m.vp.Width - 2
+	if w < 20 {
+		w = 20
+	}
+	// Pin the style instead of WithAutoStyle(): auto probes the terminal's
+	// background via OSC 11, and the reply races with Bubble Tea's raw-mode
+	// stdin reader on first paint, leaking fragments like "b:2424/2727/3a3a\"
+	// into the input field. The BBS palette is dark-on-black regardless.
+	r, err := glamour.NewTermRenderer(
+		glamour.WithStandardStyle("dark"),
+		glamour.WithWordWrap(w),
+	)
+	if err == nil {
+		m.md = r
+	}
+}
+
+// add appends a plain text entry (user/claude/info/error) and rebuilds.
+func (m *model) add(k entryKind, text string) {
+	m.entries = append(m.entries, entry{kind: k, text: text})
+	m.rebuild()
+}
+
+func (m *model) addDiffs(ds []fileDiff) {
+	m.entries = append(m.entries, entry{kind: entDiff, diffs: ds})
+	m.rebuild()
+}
+
+func (m *model) addTool(name string, input json.RawMessage) {
+	m.entries = append(m.entries, entry{kind: entTool, toolName: name, toolInput: input})
+	m.rebuild()
+}
+
+func (m *model) addToolResult(name, body string, isErr bool) {
+	m.entries = append(m.entries, entry{kind: entToolResult, toolName: name, toolResult: body, toolError: isErr})
+	m.rebuild()
+}
+
+// pendingApprovalMsg delivers a permission request from the approvals server
+// into the update loop.
+type pendingApprovalMsg struct{ req approvalReq }
+
+// waitApproval blocks on the next permission request. Re-issued after each
+// decision so the next one is picked up.
+func waitApproval(a *Approvals) tea.Cmd {
+	return func() tea.Msg { return pendingApprovalMsg{req: <-a.pending} }
+}

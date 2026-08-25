@@ -1,0 +1,354 @@
+// Copyright 2026 Triple Down AB
+// SPDX-License-Identifier: Apache-2.0
+
+package main
+
+import (
+	"os"
+	"strings"
+	"time"
+
+	tea "github.com/charmbracelet/bubbletea"
+)
+
+// handleKey is the keyboard dispatcher. Returns (newModel, cmd, handled). When
+// handled=false the caller should fall through to the input/viewport piping
+// so plain typing still reaches the textinput.
+func (m model) handleKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
+	// The boot splash eats the first keypress. Dismissing it reveals the header,
+	// so start its animation tick now (this path returns early, bypassing the
+	// tick-arming at the tail of Update).
+	if m.splash {
+		m.splash = false
+		return m, m.armHeaderIfNeeded(), true
+	}
+	// Help modal swallows everything except dismissal keys.
+	if m.help {
+		switch msg.String() {
+		case "esc", "?", "q", "enter":
+			m.help = false
+		}
+		return m, nil, true
+	}
+	// A picker (session resume, palette, file picker) is modal: it owns every
+	// key until it returns a selection or cancels (pickerkeys.go).
+	if m.picker != nil {
+		return m.handlePickerKey(msg)
+	}
+	// While a permission decision is pending, keys drive the approval, not
+	// the text input. Default is ALLOW: Enter (or a stray letter that arrived
+	// because you were mid-typing) consents. Deny requires the explicit Esc
+	// gesture, so an accidental "n" while writing can't blow up an approval.
+	if m.pending != nil {
+		return m.handleApprovalKey(msg)
+	}
+
+	// While the inline @-file menu is open it owns navigation/accept/dismiss so
+	// Enter inserts a path instead of submitting the turn; everything else falls
+	// through to the textarea, and syncCompletion re-derives the query (complete.go).
+	if m.comp != nil {
+		if nm, cmd, handled := m.handleCompletionKey(msg); handled {
+			return nm, cmd, true
+		}
+	}
+
+	// Arrow keys: prompt history, except with mouse capture off (/mouse), where
+	// the terminal turns the wheel into ↑/↓ — there we scroll the transcript so
+	// older output can be brought into view to select. Ctrl-↑/↓ always do
+	// history, so it stays reachable in selection mode.
+	switch s := msg.String(); s {
+	case "up", "down", "ctrl+up", "ctrl+down":
+		ctrl := s == "ctrl+up" || s == "ctrl+down"
+		// In a multi-line draft, plain up/down move the cursor between lines (let
+		// the textarea handle them); history recall stays on ctrl+up/down and on a
+		// single-line prompt.
+		if !ctrl && m.input.LineCount() > 1 {
+			return m, nil, false
+		}
+		down := s == "down" || s == "ctrl+down"
+		if !m.mouse && (s == "up" || s == "down") {
+			if down {
+				m.vp.LineDown(3)
+			} else {
+				m.vp.LineUp(3)
+			}
+			m.follow = m.vp.AtBottom()
+			return m, nil, true
+		}
+		delta := -1
+		if down {
+			delta = 1
+		}
+		if v, ok := m.hist.Move(delta, m.input.Value()); ok {
+			m.input.SetValue(v)
+			m.input.CursorEnd()
+		}
+		return m, nil, true
+	}
+
+	// PageUp/PageDown scroll the transcript. The viewport's own scroll keys
+	// (space/f/b/u/d/j/k) are disabled because they collide with typing into the
+	// prompt (see scroll.go), so paging is driven explicitly here. Scrolling up
+	// pauses auto-follow; scrolling back to the bottom re-arms it.
+	switch msg.String() {
+	case "pgup":
+		m.vp.ViewUp()
+		m.follow = m.vp.AtBottom()
+		return m, nil, true
+	case "pgdown":
+		m.vp.ViewDown()
+		m.follow = m.vp.AtBottom()
+		return m, nil, true
+	// Shift+↑/↓ page by *prompt* — the same gesture at a coarser grain, for
+	// finding what you asked earlier (jump.go). Consumed either way so an
+	// unavailable step can't fall through into the textarea.
+	case "shift+up":
+		m.jumpPrompt(-1)
+		return m, nil, true
+	case "shift+down":
+		m.jumpPrompt(1)
+		return m, nil, true
+	}
+
+	// Shift+Tab cycles permission mode without restarting the subprocess.
+	// Order is increasing autonomy: PLAN → EDIT → AUTO → PLAN. bypass is
+	// intentionally excluded — that mode disables approvals entirely.
+	if msg.Type == tea.KeyShiftTab {
+		if m.mode == "bypass" {
+			m.add(entInfo, "bypass mode: restart with -mode to switch")
+		} else {
+			m.mode = nextMode(m.mode)
+			if err := m.engine.SetPermissionMode(modeToPermission(m.mode)); err != nil {
+				m.add(entError, "mode toggle failed: "+err.Error())
+			} else {
+				m.add(entInfo, "→ mode: "+modeLabel(m.mode))
+			}
+		}
+		return m, nil, true
+	}
+
+	// Modal shortcuts.
+	switch msg.String() {
+	case "ctrl+r":
+		cwd, _ := os.Getwd()
+		m.picker = newPicker("sessions", "RESUME SESSION", sessionItems(m.sessions, cwd), m.w, m.h)
+		return m, nil, true
+	case "ctrl+t":
+		m.picker = newPicker("slash", "COMMANDS", m.paletteItems(), m.w, m.h)
+		return m, nil, true
+	case "ctrl+g":
+		// Mirrors /sidebar. Ctrl-B is tmux's default prefix, so we don't bind it.
+		nm, cmd, _ := runSlash(&m, "/sidebar")
+		return nm, cmd, true
+	case "?":
+		// Only when input is empty so real "?" still types normally.
+		if strings.TrimSpace(m.input.Value()) == "" {
+			m.help = true
+			return m, nil, true
+		}
+	}
+
+	switch msg.Type {
+	case tea.KeyCtrlC:
+		return m.handleCtrlC()
+	case tea.KeyEsc:
+		return m.handleEsc()
+	case tea.KeyEnter:
+		// alt+enter arrives as Enter with the Alt modifier — that's a newline, so
+		// let it fall through to the textarea instead of submitting.
+		if msg.Alt {
+			return m, nil, false
+		}
+		return m.handleEnter()
+	}
+	return m, nil, false
+}
+
+// handleApprovalKey routes a keypress while m.pending is non-nil. Defaults to
+// allow; Esc denies; Ctrl-C exits.
+func (m model) handleApprovalKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
+	switch msg.String() {
+	case "esc":
+		m.pending.reply <- approvalReply{allow: false}
+		m.add(entInfo, "✗ denied "+m.pending.toolName)
+		m.pending = nil
+		return m, waitApproval(m.approvals), true
+	case "ctrl+c":
+		// Deny this tool (cancel the pending action) and arm the exit hint, but
+		// don't quit on the first press — a second Ctrl+C within the window does,
+		// matching the main handler. The waiter is re-armed so the session runs on.
+		m.pending.reply <- approvalReply{allow: false}
+		m.add(entInfo, "✗ denied "+m.pending.toolName)
+		m.pending = nil
+		m.ctrlCAt = time.Now()
+		return m, tea.Batch(waitApproval(m.approvals), ctrlCHintTick()), true
+	default:
+		m.pending.reply <- approvalReply{allow: true}
+		m.add(entInfo, "✓ approved "+m.pending.toolName)
+		m.pending = nil
+		return m, waitApproval(m.approvals), true
+	}
+}
+
+// answerQuestion records the chosen labels for the current AskUserQuestion, then
+// advances to the next question or — once all are answered — replies to claude
+// with the combined answer (via the permission deny-message) and re-arms the
+// approvals waiter. labels holds one label per marked option: several for a
+// multiSelect question, one otherwise.
+func (m *model) answerQuestion(labels []string) tea.Cmd {
+	q := m.question
+	if q == nil || len(labels) == 0 {
+		return nil
+	}
+	q.answers = append(q.answers, labels)
+	q.idx++
+	if q.idx < len(q.questions) {
+		m.picker = q.picker(m.w, m.h)
+		return nil
+	}
+	q.req.reply <- approvalReply{message: q.answerMessage()}
+	m.add(entInfo, "✓ "+q.summary())
+	m.question = nil
+	return waitApproval(m.approvals)
+}
+
+// cancelQuestion dismisses the question (Esc): claude is told it went
+// unanswered, and the waiter is re-armed.
+func (m *model) cancelQuestion() tea.Cmd {
+	q := m.question
+	if q == nil {
+		return nil
+	}
+	q.req.reply <- approvalReply{message: "The user dismissed the question without answering."}
+	m.add(entInfo, "✗ dismissed question")
+	m.question = nil
+	return waitApproval(m.approvals)
+}
+
+// handleEsc cascades: interrupt in-flight → quit. So a stray Esc with work in
+// flight aborts the current turn (the way to undo a mis-sent steer) rather than
+// dropping the whole session.
+func (m model) handleEsc() (model, tea.Cmd, bool) {
+	if m.busy {
+		return m.interrupt(), nil, true
+	}
+	return m, tea.Quit, true
+}
+
+// ctrlCExitWindow is how long after a Ctrl+C a second one still means "exit".
+const ctrlCExitWindow = 2 * time.Second
+
+// ctrlCHintMsg fires ctrlCExitWindow after a Ctrl+C so the status bar repaints
+// once the "again to exit" hint has lapsed (the frame it triggers recomputes
+// ctrlCArmed, which is now false). See handleCtrlC.
+type ctrlCHintMsg struct{}
+
+func ctrlCHintTick() tea.Cmd {
+	return tea.Tick(ctrlCExitWindow, func(time.Time) tea.Msg { return ctrlCHintMsg{} })
+}
+
+// ctrlCArmed reports whether a Ctrl+C landed recently enough that the next one
+// exits — which is also when the status bar shows the "^C again to exit" hint.
+func (m model) ctrlCArmed() bool {
+	return !m.ctrlCAt.IsZero() && time.Since(m.ctrlCAt) < ctrlCExitWindow
+}
+
+// handleCtrlC gives Ctrl+C the Claude-Code cadence: the first press clears a
+// half-typed prompt and cancels the running turn (or, when idle with an empty
+// prompt, just arms) and shows an "again to exit" hint; a second press within
+// ctrlCExitWindow quits. So a reflexive Ctrl+C discards the draft or stops the
+// work instead of dropping the whole session, but a deliberate double-tap still
+// exits fast. Quitting returns tea.Quit without closing the engine — main tears
+// the subprocess down after Run() (closing it here deadlocks; see Engine.Close).
+func (m model) handleCtrlC() (model, tea.Cmd, bool) {
+	if m.ctrlCArmed() {
+		return m, tea.Quit, true
+	}
+	m.ctrlCAt = time.Now()
+	if m.busy {
+		m = m.interrupt()
+	}
+	// Clearing the draft is the cheapest thing this key can do, so it happens on
+	// the first press — a prompt that went wrong is discarded with one key instead
+	// of a held backspace. The exit window arms either way, so the second press
+	// still quits. The @-menu is re-derived here because a handled key skips the
+	// syncCompletion at the tail of Update (update.go), and the walk cursor is
+	// rewound so Ctrl-Up recalls from live again after a recalled prompt is wiped.
+	if m.input.Value() != "" {
+		m.input.SetValue("")
+		m.hist.Rewind()
+		m.syncCompletion()
+	}
+	return m, ctrlCHintTick(), true
+}
+
+// interrupt aborts the in-flight turn and hands the prompt back. Shared by Esc
+// and Ctrl+C. busy is flipped off proactively — claude may still emit a few late
+// events, but the user gets the prompt back immediately.
+func (m model) interrupt() model {
+	if err := m.engine.Interrupt(); err != nil {
+		m.add(entError, "interrupt failed: "+err.Error())
+	} else {
+		m.add(entInfo, "✗ interrupted")
+	}
+	m.busy = false
+	m.stopCompacting()
+	return m
+}
+
+// handleEnter dispatches a non-empty submission: slash commands run in-process,
+// busy turns enqueue, otherwise we send to claude.
+func (m model) handleEnter() (model, tea.Cmd, bool) {
+	raw := m.input.Value()
+	// A trailing "\" turns Enter into a line break — portable multi-line entry
+	// without a modifier (alt+enter / ctrl+j also insert one).
+	if strings.HasSuffix(raw, "\\") {
+		m.input.SetValue(raw[:len(raw)-1] + "\n")
+		m.input.CursorEnd()
+		return m, nil, true
+	}
+	text := strings.TrimSpace(raw)
+	if text == "" {
+		return m, nil, false
+	}
+	// Slash command intercept: our in-process commands run here. A command we
+	// don't recognize is NOT an error — it falls through to the send path below
+	// and goes to claude as a normal turn, so claude's own / custom / plugin
+	// slash commands (and prompt templates) still run, the way /compact does.
+	if strings.HasPrefix(text, "/") {
+		if nm, cmd, handled := runSlash(&m, text); handled {
+			nm.input.SetValue("")
+			nm.hist.Append(text)
+			return nm, cmd, true
+		}
+	}
+	m.input.SetValue("")
+	cmd := m.sendTurn(text)
+	return m, cmd, true
+}
+
+// sendTurn submits text as a user turn. When claude is already working the
+// message is handed to the running subprocess right away, so claude injects it
+// into the turn at its next step boundary (steering) — you can course-correct
+// mid-flight instead of waiting for the turn to end. Idle, it opens a fresh
+// turn. Either way it lands in the transcript now, is recorded in history, and
+// arms the working spinner. Shared by Enter (typed prompts and forwarded slash
+// commands) and the command palette, so all reach claude the same way.
+func (m *model) sendTurn(text string) tea.Cmd {
+	m.hist.Append(text)
+	steering := m.busy
+	m.add(entUser, text)
+	if err := m.engine.Send(text); err != nil {
+		m.add(entError, "send error: "+err.Error())
+		return nil
+	}
+	// Capture the first prompt for the session so the resume picker has a
+	// human-recognisable label — only when opening a turn, so a mid-turn steer
+	// doesn't overwrite it with a follow-up correction.
+	if !steering && m.session != "" {
+		cwd, _ := os.Getwd()
+		m.sessions.Touch(m.session, m.modelID, cwd, truncFirst(text), time.Now())
+	}
+	m.busy = true
+	return m.armSpinnerIfNeeded()
+}

@@ -1,0 +1,9 @@
+# built binary (Makefile outputs ./cathode) and default go name
+/cathode
+/ccharness
+*.test
+*.out
+.DS_Store
+
+# local agent instructions - not published
+CLAUDE.md
