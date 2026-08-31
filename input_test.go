@@ -4,6 +4,7 @@
 package main
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -168,5 +169,29 @@ func TestUpdatePasteGrowsPrompt(t *testing.T) {
 	nm := next.(model)
 	if nm.promptRows() != 3 {
 		t.Fatalf("pasted 3 lines should grow the prompt to 3 rows, got %d (value=%q)", nm.promptRows(), nm.input.Value())
+	}
+}
+
+// A big paste must arrive whole. bubbles caps textarea *content* at MaxHeight
+// (default 99) and truncates a longer paste in silence, so newPromptArea clears
+// it — the display height is capped separately, by syncPromptHeight.
+func TestUpdateLargePasteIsNotTruncated(t *testing.T) {
+	const lines = 500
+	body := make([]string, lines)
+	for i := range body {
+		body[i] = fmt.Sprintf("line %d", i)
+	}
+	want := strings.Join(body, "\n")
+
+	m := inputModel("")
+	m.vp = newTranscriptViewport(40, 6)
+	m.lastActivity = time.Now()
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(want), Paste: true})
+	nm := next.(model)
+	if got := nm.input.Value(); got != want {
+		t.Fatalf("paste of %d lines was truncated to %d lines", lines, strings.Count(got, "\n")+1)
+	}
+	if got := nm.promptRows(); got != maxPromptRows {
+		t.Fatalf("the visible prompt should stay at the %d-row cap, got %d", maxPromptRows, got)
 	}
 }
