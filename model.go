@@ -192,6 +192,10 @@ func newPromptArea() textarea.Model {
 	ta.Placeholder = "Ask Claude…  (enter sends · alt+enter / ctrl+j / \\↵ for a new line)"
 	ta.Prompt = "› "
 	ta.CharLimit = 0
+	// MaxHeight caps the *content*, not the display: bubbles defaults it to 99
+	// and silently truncates a longer paste. The display height is ours
+	// (syncPromptHeight, capped at maxPromptRows), so drop the cap entirely.
+	ta.MaxHeight = 0
 	ta.ShowLineNumbers = false
 	ta.FocusedStyle.CursorLine = lipgloss.NewStyle() // no current-line highlight bar
 	ta.KeyMap.InsertNewline = key.NewBinding(key.WithKeys("alt+enter", "ctrl+j"))
