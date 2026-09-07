@@ -118,7 +118,7 @@ func (m model) handleKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 			m.add(entInfo, "bypass mode: restart with -mode to switch")
 		} else {
 			m.mode = nextMode(m.mode)
-			if err := m.engine.SetPermissionMode(modeToPermission(m.mode)); err != nil {
+			if err := m.engine.SetPermissionMode(m.mode); err != nil {
 				m.add(entError, "mode toggle failed: "+err.Error())
 			} else {
 				m.add(entInfo, "→ mode: "+modeLabel(m.mode))

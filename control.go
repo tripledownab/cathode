@@ -61,11 +61,14 @@ func (e *claudeEngine) Interrupt() error {
 	return e.sendControl("int", map[string]string{"subtype": "interrupt"})
 }
 
-// SetPermissionMode switches permission mode mid-session. mode is one of
-// "default" | "plan" | "acceptEdits" | "bypassPermissions" — the same values
-// --permission-mode takes.
+// SetPermissionMode switches permission mode mid-session. mode is a cathode
+// mode (see the Engine interface); modeToPermission turns it into the value
+// --permission-mode takes, so claude's vocabulary stops at this line.
 func (e *claudeEngine) SetPermissionMode(mode string) error {
-	return e.sendControl("ctrl", map[string]string{"subtype": "set_permission_mode", "mode": mode})
+	return e.sendControl("ctrl", map[string]string{
+		"subtype": "set_permission_mode",
+		"mode":    modeToPermission(mode),
+	})
 }
 
 // SetModel switches the model for subsequent turns. model is a CLI alias

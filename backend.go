@@ -26,7 +26,11 @@ type Engine interface {
 	Initialize() error
 	// Interrupt asks the subprocess to abort the turn in flight.
 	Interrupt() error
-	// SetPermissionMode switches permission mode without a restart.
+	// SetPermissionMode switches permission mode without a restart. mode is a
+	// *cathode* mode (ask | plan | build | bypass), not a backend's own
+	// vocabulary: each implementation translates. The seam described claude's
+	// --permission-mode values at first, which meant a second backend had to
+	// reverse that translation before doing its own.
 	SetPermissionMode(mode string) error
 	// SetModel switches the model for subsequent turns.
 	SetModel(model string) error
@@ -36,8 +40,19 @@ type Engine interface {
 	Close()
 }
 
-// Compile-time proof that the claude backend satisfies the seam. main already
+// How cathode identifies itself to a backend that asks. codex's initialize
+// handshake wants both, and the name reaches its user-agent string, so this is
+// the plain name rather than the wordmark appName renders on screen.
+const (
+	clientName    = "cathode"
+	clientVersion = "0.1.0"
+)
+
+// Compile-time proof that each backend satisfies the seam. main already
 // forces this by passing one to newModel, but stating it here keeps the check
 // attached to the interface rather than to whichever call site happens to
 // exist.
-var _ Engine = (*claudeEngine)(nil)
+var (
+	_ Engine = (*claudeEngine)(nil)
+	_ Engine = (*codexEngine)(nil)
+)
