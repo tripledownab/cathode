@@ -98,18 +98,27 @@ func sysPromptSummary() string {
 // cannot disagree. The error is the style file's — main reports it and starts
 // without the prompt, because a session without the user's style still works.
 // Called once from main.
-func sysPromptArgs(on bool) ([]string, error) {
+//
+// applied is the text the returned flag actually selects, and "" whenever the
+// flag is not returned — including the write failure, where the toggle is on
+// and the file has text but no style reached claude. It is the single answer to
+// "what standing instructions is the live subprocess running with", which is
+// why main hands it straight to newModel rather than letting the model re-derive
+// it from the setting. Two places deciding that separately is how the reminder
+// (remind.go) and the edited-file check (sysPromptEdited) would come to
+// disagree with the launch.
+func sysPromptArgs(on bool) (args []string, applied string, err error) {
 	if !on {
-		return nil, nil
+		return nil, "", nil
 	}
 	text := loadSysPrompt()
 	if text == "" {
-		return nil, nil
+		return nil, "", nil
 	}
 	if err := writeOutputStyle(text); err != nil {
-		return nil, err
+		return nil, "", err
 	}
-	return []string{"--settings", outputStyleSettings()}, nil
+	return []string{"--settings", outputStyleSettings()}, text, nil
 }
 
 // Toggle ids for the picker.

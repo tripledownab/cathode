@@ -338,7 +338,10 @@ func (m *model) sendTurn(text string) tea.Cmd {
 	m.hist.Append(text)
 	steering := m.busy
 	m.add(entUser, text)
-	if err := m.engine.Send(text); err != nil {
+	// The transcript above shows what the user typed. What claude receives also
+	// carries the standing-instruction reminder (remind.go), which is why the
+	// entry is added before this and not from the sent text.
+	if err := m.engine.Send(withReminder(text, m.sysPromptSeen)); err != nil {
 		m.add(entError, "send error: "+err.Error())
 		return nil
 	}

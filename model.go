@@ -175,9 +175,12 @@ type model struct {
 	outTokens int
 	ctxLimit  int
 	resumeID  string // set via restartResuming (session picker, /sysprompt); main.go re-execs on it after p.Run()
-	// sysPromptSeen is the appended prompt text as claude got it at launch, or
-	// "" when the toggle was off. The flag reads the file once, at startup, so
-	// this is what the live subprocess is running with (sysprompt.go).
+	// sysPromptSeen is the standing-instruction text as claude got it at launch,
+	// and "" whenever no style reached claude: the toggle off, an empty prompt
+	// file, or a style file that could not be written. The flag reads the file
+	// once, at startup, so this is what the live subprocess is running with
+	// (sysprompt.go). Two consumers depend on that: sysPromptEdited compares it
+	// against the file, and remind.go gates the per-turn reminder on it.
 	sysPromptSeen string
 	ready         bool
 	w, h          int
@@ -210,7 +213,7 @@ func (m *model) setPromptWidth(w int) {
 	m.input.SetWidth(w)
 }
 
-func newModel(e *Engine, mode string, a *Approvals, spin, resumeID string) model {
+func newModel(e *Engine, mode string, a *Approvals, spin, resumeID, sysPrompt string) model {
 	ta := newPromptArea()
 	ta.Focus()
 
@@ -243,11 +246,12 @@ func newModel(e *Engine, mode string, a *Approvals, spin, resumeID string) model
 		mouse:        true, // started with tea.WithMouseCellMotion in main.go
 		lastActivity: time.Now(),
 	}
-	// Record the prompt text this process launched with, so a later edit to the
-	// file is detectable (sysprompt.go:sysPromptEdited).
-	if st.SysPrompt {
-		m.sysPromptSeen = loadSysPrompt()
-	}
+	// The prompt text this process launched with, straight from the function
+	// that composed the flag (sysprompt.go:sysPromptArgs). Re-reading the file
+	// here instead would answer a different question — the setting is on and the
+	// file has text — which is not the same as claude having loaded a style, and
+	// the two part company when writing the style file fails.
+	m.sysPromptSeen = sysPrompt
 	m.setPromptWidth(defW - 4)
 	m.makeRenderer()
 	// On resume, replay the last N turns from claude's own JSONL so the

@@ -29,7 +29,10 @@ const (
 // replayUserText projects one text block of a user record into a transcript
 // entry, and reports which kind of record it came from.
 func replayUserText(text string) (entry, replayKind) {
-	t := strings.TrimSpace(text)
+	// Our own per-turn reminder was appended to the prompt on the way out
+	// (remind.go), so claude stored it as part of the user record. Take it back
+	// off before anything else looks at the text.
+	t := strings.TrimSpace(stripReminder(text))
 	if t == "" {
 		return entry{}, replaySkip
 	}

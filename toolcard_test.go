@@ -13,7 +13,7 @@ import (
 // toolCardModel is a model ready to take both halves of one tool call: the
 // assistant stream event and the approval request.
 func toolCardModel() *model {
-	m := newModel(&Engine{}, "ask", nil, "bar", "")
+	m := newModel(&Engine{}, "ask", nil, "bar", "", "")
 	m.vp = viewport.New(80, 24)
 	m.ready = true
 	return &m

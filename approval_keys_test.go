@@ -15,7 +15,7 @@ import (
 // inject one key, and return the decision the approval handler made.
 func driveApproval(t *testing.T, key tea.KeyMsg) bool {
 	t.Helper()
-	m := newModel(&Engine{}, "ask", nil, "bar", "")
+	m := newModel(&Engine{}, "ask", nil, "bar", "", "")
 	// newModel sets splash=true; the splash eats the first keypress, which
 	// would defeat the test. Skip past it.
 	m.splash = false

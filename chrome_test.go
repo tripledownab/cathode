@@ -33,7 +33,7 @@ func TestScrollbarAutoHideRendering(t *testing.T) {
 // A user scroll surfaces the scrollbar (glyphs land in the body); once the
 // visibility window lapses it hides again, so the transcript copies clean.
 func TestScrollbarPokeThenLapse(t *testing.T) {
-	m := newModel(&Engine{}, "ask", nil, "bar", "")
+	m := newModel(&Engine{}, "ask", nil, "bar", "", "")
 	m.splash = false
 	for i := 0; i < 60; i++ { // overflow the viewport so a scrollbar exists
 		m.add(entInfo, fmt.Sprintf("transcript line %d", i))
@@ -72,7 +72,7 @@ func lineCount(s string) int {
 // pushes the total past the terminal.
 func TestFrameFitsHeight(t *testing.T) {
 	for _, h := range []int{14, 16, 20, 30, 40} {
-		m := newModel(&Engine{}, "ask", nil, "bar", "")
+		m := newModel(&Engine{}, "ask", nil, "bar", "", "")
 		m.w, m.h = 80, h
 		m.setPromptWidth(m.w - 4)
 		m.resizeViewport()
