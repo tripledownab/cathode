@@ -7,3 +7,7 @@
 
 # local agent instructions - not published
 CLAUDE.md
+
+# local planning notes - not published. A glob, so the pattern never has to
+# name the thing being planned: this file ships, and a filename is a signal.
+PLAN-*.md
