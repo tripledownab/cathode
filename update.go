@@ -119,6 +119,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case streamMsg:
 		m.handleEvent(msg.env)
 
+	case codexMsg:
+		m.handleCodexEvent(msg.frame)
+
+	case engineInitErrMsg:
+		m.add(entError, "handshake failed: "+msg.err.Error())
+
 	case pendingApprovalMsg:
 		// AskUserQuestion is a question, not a permission. Always present it — even
 		// in build/bypass, and never auto-approve — and answer it via the picker

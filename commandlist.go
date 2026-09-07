@@ -35,7 +35,7 @@ func slashCommands() []slashCmd {
 						m.add(entInfo, "bypass mode: restart with -mode to switch")
 					} else {
 						m.mode = nextMode(m.mode)
-						if err := m.engine.SetPermissionMode(modeToPermission(m.mode)); err != nil {
+						if err := m.engine.SetPermissionMode(m.mode); err != nil {
 							m.add(entError, "mode toggle failed: "+err.Error())
 						} else {
 							m.add(entInfo, "→ mode: "+modeLabel(m.mode))
@@ -46,7 +46,7 @@ func slashCommands() []slashCmd {
 				switch arg {
 				case "plan", "ask", "build":
 					m.mode = arg
-					if err := m.engine.SetPermissionMode(modeToPermission(arg)); err != nil {
+					if err := m.engine.SetPermissionMode(arg); err != nil {
 						m.add(entError, "mode set failed: "+err.Error())
 					} else {
 						m.add(entInfo, "→ mode: "+modeLabel(arg))

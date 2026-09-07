@@ -35,12 +35,22 @@ func fallbackModelItems() []pickerItem {
 	}
 }
 
+// engineInitErrMsg reports a handshake that failed. It used to be discarded,
+// which was harmless while claude was the only backend: there the handshake is
+// a fire-and-forget control request and a session runs fine without it. It is
+// not harmless generally — a backend that opens its conversation during the
+// handshake has no conversation if it fails, and every later turn fails with a
+// message about internal state instead of the reason.
+type engineInitErrMsg struct{ err error }
+
 // requestModels runs the initialize handshake so the model list is cached
 // before the user opens /model. The reply arrives via the stream as a
 // control_response (see handleEvent). Wired into model.Init().
 func requestModels(e Engine) tea.Cmd {
 	return func() tea.Msg {
-		_ = e.Initialize()
+		if err := e.Initialize(); err != nil {
+			return engineInitErrMsg{err: err}
+		}
 		return nil
 	}
 }

@@ -76,12 +76,34 @@ make clean      # remove ./cathode
 
 | flag     | default | meaning                                                                   |
 |----------|---------|---------------------------------------------------------------------------|
+| `-backend`| `claude`| agent CLI to drive: `claude` or `codex`                                  |
 | `-mode`  | `build` | `ask` (gated, shows approval pane) | `plan` (read-only) | `build` (auto-accept edits) | `bypass` |
 | `-mcp`   | `""`    | path to a `.mcp.json` that wires your internal tools                      |
 | `-model` | `""`    | pin a model (e.g. `sonnet`); empty uses the account default               |
 | `-spinner`| `bar`  | working throbber: `bar` | `shade` | `block` | `arrow` | `scan`           |
-| `-resume`| `""`    | claude session id to resume (set automatically when picking via `ctrl+r`) |
+| `-resume`| `""`    | session id to resume (set automatically when picking via `ctrl+r`)        |
 | `-ctx`   | `200k`  | context-gauge window: `200k` / `500k` / `1m` or a raw count; auto-grows   |
+
+## Backends
+
+Cathode drives `claude` by default. `-backend codex` drives OpenAI's `codex`
+CLI instead, over its `app-server` JSON-RPC protocol. Both run on a
+subscription: cathode never sets an API key, and strips the variables that
+would divert billing to one.
+
+Codex needs `codex login` completed, the same way claude needs `claude login`.
+
+The codex backend is newer and narrower than the claude one:
+
+- `build` and `bypass` work fully. Tools run, and codex asks for nothing.
+- `ask` and `plan` refuse gated actions rather than granting them, because the
+  approval pane is not wired to codex yet.
+- Tool calls and file changes render as cards. Side-by-side diffs, session
+  replay and the slash-command palette are claude-only so far.
+
+`CATHODE_CODEX_LIVE=1 go test -run TestCodexLive ./...` exercises the backend
+against the real CLI. It spends a turn on your subscription, so it is off by
+default.
 | `-debug` | `""`    | tee raw stream-json + MCP traffic to this logfile                         |
 
 ## Themes

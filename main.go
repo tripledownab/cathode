@@ -66,6 +66,7 @@ func nextMode(cur string) string {
 }
 
 func main() {
+	backend := flag.String("backend", "claude", "agent CLI to drive: claude | codex")
 	mode := flag.String("mode", "build", "ask | plan | build | bypass")
 	mcp := flag.String("mcp", "", "path to a .mcp.json that wires your internal tools")
 	modelID := flag.String("model", "", "pin a model (e.g. sonnet); empty uses account default")
@@ -86,9 +87,11 @@ func main() {
 	}
 
 	// Start the in-process approval server unless we're in bypass mode (where
-	// nothing is gated, so there's nothing to approve).
+	// nothing is gated, so there's nothing to approve), or on codex, which
+	// raises approvals as JSON-RPC requests on its own connection and has no use
+	// for a localhost MCP server.
 	var approvals *Approvals
-	if *mode != "bypass" {
+	if *mode != "bypass" && *backend != backendCodex {
 		if a, err := StartApprovals(); err == nil {
 			approvals = a
 		} else {
@@ -122,10 +125,9 @@ func main() {
 		cfg.PermissionPromptTool = approvals.permissionToolName()
 	}
 
-	engine, err := newClaudeEngine(cfg)
+	engine, err := startEngine(*backend, cfg, *mode, *resume, *modelID)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "failed to start claude:", err)
-		fmt.Fprintln(os.Stderr, "is the `claude` CLI installed and on PATH, and have you run `claude login`?")
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 
