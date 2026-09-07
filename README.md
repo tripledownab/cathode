@@ -98,8 +98,11 @@ The codex backend is newer and narrower than the claude one:
 - `build` and `bypass` work fully. Tools run, and codex asks for nothing.
 - `ask` and `plan` refuse gated actions rather than granting them, because the
   approval pane is not wired to codex yet.
-- Tool calls and file changes render as cards. Side-by-side diffs, session
-  replay and the slash-command palette are claude-only so far.
+- File changes render as real diff cards, in both the unified and side-by-side
+  styles. Other tool calls render as plain cards rather than the typed ones
+  claude gets.
+- Session replay, `/compact` and the slash-command palette are claude-only so
+  far.
 
 `CATHODE_CODEX_LIVE=1 go test -run TestCodexLive ./...` exercises the backend
 against the real CLI. It spends a turn on your subscription, so it is off by

@@ -154,6 +154,11 @@ type model struct {
 	frameBody  string
 	bodyKey    bodyKey
 	contentVer int
+	// agentCwd is the working root the agent reported for this session. Used to
+	// shorten paths for display. Read from the protocol rather than os.Getwd
+	// because the two are only equal by convention: the agent is told its root
+	// explicitly, and nothing stops it differing.
+	agentCwd   string
 	toolUses   map[string]string // tool_use_id -> tool name, so tool_result events can show what they're answering
 	shownTools map[string]bool   // tool_use_ids already drawn as a card/diff, so the stream and approval paths don't both draw one (toolcard.go)
 	busy       bool

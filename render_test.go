@@ -36,7 +36,7 @@ func TestDiffRendering(t *testing.T) {
 	if !ok || len(ds) != 1 {
 		t.Fatalf("Edit not detected: ok=%v n=%d", ok, len(ds))
 	}
-	out := renderDiff(ds[0].file, ds[0].old, ds[0].new, 80)
+	out := renderDiff(ds[0].file, ds[0].unifiedText(), 80)
 	for _, want := range []string{"main.go", "+", "-", "│"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("diff missing %q in:\n%s", want, out)

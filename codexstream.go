@@ -62,6 +62,7 @@ func (m *model) noteCodexThread(f codexFrame) {
 		Thread struct {
 			ID    string `json:"id"`
 			Model string `json:"model"`
+			Cwd   string `json:"cwd"`
 		} `json:"thread"`
 	}
 	if json.Unmarshal(f.Params, &p) != nil || p.Thread.ID == "" {
@@ -74,6 +75,7 @@ func (m *model) noteCodexThread(f codexFrame) {
 	if p.Thread.Model != "" {
 		m.modelID = p.Thread.Model
 	}
+	m.agentCwd = p.Thread.Cwd
 	m.add(entInfo, fmt.Sprintf("— thread %s · %s —", short(p.Thread.ID), m.modelID))
 }
 

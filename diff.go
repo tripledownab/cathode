@@ -13,8 +13,27 @@ import (
 	udiff "github.com/aymanbagabas/go-udiff"
 )
 
-// fileDiff is one before/after pair to visualise. A MultiEdit produces several.
-type fileDiff struct{ file, old, new string }
+// fileDiff is one file change to visualise. A MultiEdit produces several.
+//
+// Usually it holds the before and after text and the diff is computed here.
+// Some backends have already computed it: codex reports an edit as a ready-made
+// unified hunk and never sends the whole file, so there is no before/after pair
+// to hold. `unified` carries that case, and both renderers work from unified
+// text anyway — computing it was only ever the first step.
+type fileDiff struct {
+	file, old, new string
+	unified        string // already-computed diff; old/new are unused when set
+}
+
+// unifiedText is the single answer to "what should this card render". Keeping
+// it in one place is what stops the two renderers disagreeing about when a
+// supplied diff wins over a computed one.
+func (d fileDiff) unifiedText() string {
+	if d.unified != "" {
+		return d.unified
+	}
+	return udiff.Unified("a/"+d.file, "b/"+d.file, d.old, d.new)
+}
 
 // edit-tool input shapes from Claude Code.
 type editInput struct {
@@ -43,20 +62,20 @@ func diffsForTool(name string, input json.RawMessage) ([]fileDiff, bool) {
 	case "Edit":
 		var in editInput
 		if json.Unmarshal(input, &in) == nil && in.FilePath != "" {
-			return []fileDiff{{in.FilePath, in.OldString, in.NewString}}, true
+			return []fileDiff{{file: in.FilePath, old: in.OldString, new: in.NewString}}, true
 		}
 	case "Write":
 		var in writeInput
 		if json.Unmarshal(input, &in) == nil && in.FilePath != "" {
 			old, _ := os.ReadFile(in.FilePath) // empty if new file
-			return []fileDiff{{in.FilePath, string(old), in.Content}}, true
+			return []fileDiff{{file: in.FilePath, old: string(old), new: in.Content}}, true
 		}
 	case "MultiEdit":
 		var in multiEditInput
 		if json.Unmarshal(input, &in) == nil && in.FilePath != "" {
 			var ds []fileDiff
 			for _, e := range in.Edits {
-				ds = append(ds, fileDiff{in.FilePath, e.OldString, e.NewString})
+				ds = append(ds, fileDiff{file: in.FilePath, old: e.OldString, new: e.NewString})
 			}
 			if len(ds) > 0 {
 				return ds, true
@@ -66,12 +85,15 @@ func diffsForTool(name string, input json.RawMessage) ([]fileDiff, bool) {
 	return nil, false
 }
 
-// renderDiff builds one styled, line-numbered diff card.
-func renderDiff(filename, oldText, newText string, width int) string {
+// renderDiff builds one styled, line-numbered diff card from unified diff text.
+//
+// It takes the unified text rather than a before/after pair because that is
+// what it always worked on: the old signature computed the unified form on the
+// first line and spent the rest of the function parsing it back.
+func renderDiff(filename, u string, width int) string {
 	if width < 24 {
 		width = 24
 	}
-	u := udiff.Unified("a/"+filename, "b/"+filename, oldText, newText)
 	if strings.TrimSpace(u) == "" {
 		return dBox.Width(width - 2).Render(dTitle.Render(" "+filename+" ") + "\n" + dCtx.Render("(no changes)"))
 	}
