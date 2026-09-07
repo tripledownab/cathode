@@ -38,7 +38,7 @@ func fallbackModelItems() []pickerItem {
 // requestModels runs the initialize handshake so the model list is cached
 // before the user opens /model. The reply arrives via the stream as a
 // control_response (see handleEvent). Wired into model.Init().
-func requestModels(e *Engine) tea.Cmd {
+func requestModels(e Engine) tea.Cmd {
 	return func() tea.Msg {
 		_ = e.Initialize()
 		return nil

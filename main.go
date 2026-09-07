@@ -122,14 +122,21 @@ func main() {
 		cfg.PermissionPromptTool = approvals.permissionToolName()
 	}
 
-	engine, err := NewEngine(cfg)
+	engine, err := newClaudeEngine(cfg)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "failed to start claude:", err)
 		fmt.Fprintln(os.Stderr, "is the `claude` CLI installed and on PATH, and have you run `claude login`?")
 		os.Exit(1)
 	}
 
-	m := newModel(engine, *mode, approvals, *spin, *resume, sysPrompt)
+	m := newModel(launchConfig{
+		Engine:    engine,
+		Approvals: approvals,
+		Mode:      *mode,
+		Spinner:   *spin,
+		ResumeID:  *resume,
+		SysPrompt: sysPrompt,
+	})
 	m.ctxLimit = parseTokenCount(*ctx)
 	// A resumed session may already exceed the base limit; grow it now that the
 	// -ctx flag has set the floor, so the gauge starts honest (see observeCtx).

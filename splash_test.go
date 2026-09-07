@@ -14,7 +14,7 @@ import (
 // symptom where ./doorway -mode ask appears to hang at "starting…" on first
 // run, while the engine is healthy.
 func TestSplashRendersBeforeWindowSizeMsg(t *testing.T) {
-	m := newModel(&Engine{}, "ask", nil, "bar", "", "")
+	m := newModel(launchConfig{Engine: &claudeEngine{}, Mode: "ask", Spinner: "bar"})
 	// Fast-forward the reveal so the modem-handshake markers are present.
 	// The test isn't about the animation; it's about the "starting…"
 	// placeholder never leaking through before WindowSizeMsg.

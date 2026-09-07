@@ -163,7 +163,11 @@ func TestCompletionEscDismissUntilTokenLeft(t *testing.T) {
 func TestCompletionMenuRendersAbovePrompt(t *testing.T) {
 	defer withStubFiles([]string{"go.mod", "main.go", "keys.go"})()
 
-	var tm tea.Model = func() model { m := newModel(&Engine{}, "ask", nil, "bar", "", ""); m.splash = false; return m }()
+	var tm tea.Model = func() model {
+		m := newModel(launchConfig{Engine: &claudeEngine{}, Mode: "ask", Spinner: "bar"})
+		m.splash = false
+		return m
+	}()
 	tm, _ = tm.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
 	tm, _ = tm.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'@'}})
 	tm, _ = tm.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})

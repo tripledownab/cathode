@@ -11,7 +11,7 @@ import (
 )
 
 func TestRebuildRendersMarkdown(t *testing.T) {
-	m := newModel(&Engine{}, "ask", nil, "bar", "", "")
+	m := newModel(launchConfig{Engine: &claudeEngine{}, Mode: "ask", Spinner: "bar"})
 	m.vp = viewport.New(80, 24)
 	m.ready = true
 	m.makeRenderer()

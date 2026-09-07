@@ -59,7 +59,7 @@ type bodyKey struct {
 // model is the Bubble Tea model. Field grouping mirrors the lifecycle:
 // external services up top, modal flags, widgets, then session/turn state.
 type model struct {
-	engine    *Engine
+	engine    Engine
 	approvals *Approvals
 	md        *glamour.TermRenderer
 	hist      *history
@@ -213,12 +213,12 @@ func (m *model) setPromptWidth(w int) {
 	m.input.SetWidth(w)
 }
 
-func newModel(e *Engine, mode string, a *Approvals, spin, resumeID, sysPrompt string) model {
+func newModel(cfg launchConfig) model {
 	ta := newPromptArea()
 	ta.Focus()
 
 	sp := spinner.New()
-	sp.Spinner = bbsSpinner(spin)
+	sp.Spinner = bbsSpinner(cfg.Spinner)
 
 	// Seed a sensible default size so the splash (and the rest of the UI)
 	// renders on the very first frame. If the initial tea.WindowSizeMsg
@@ -228,12 +228,12 @@ func newModel(e *Engine, mode string, a *Approvals, spin, resumeID, sysPrompt st
 	st := loadSettings()
 	applyTheme(st.Theme) // re-skin all styles to the persisted theme before first paint
 	m := model{
-		engine: e, approvals: a,
+		engine: cfg.Engine, approvals: cfg.Approvals,
 		hist:     openHistory(),
 		sessions: openSessionStore(),
 		input:    ta, sp: sp,
 		settings: st, headerStyle: st.Header,
-		mode: mode, splash: true,
+		mode: cfg.Mode, splash: true,
 		// Start at frame 1 so the wordmark is visible on the first paint;
 		// without this the user sees ~140ms of blank screen before the first
 		// splash tick fires.
@@ -251,18 +251,18 @@ func newModel(e *Engine, mode string, a *Approvals, spin, resumeID, sysPrompt st
 	// here instead would answer a different question — the setting is on and the
 	// file has text — which is not the same as claude having loaded a style, and
 	// the two part company when writing the style file fails.
-	m.sysPromptSeen = sysPrompt
+	m.sysPromptSeen = cfg.SysPrompt
 	m.setPromptWidth(defW - 4)
 	m.makeRenderer()
 	// On resume, replay the last N turns from claude's own JSONL so the
 	// transcript isn't empty after re-exec. claude itself loads the session
 	// into context — this is purely a visual rehydrate.
-	if resumeID != "" {
+	if cfg.ResumeID != "" {
 		// Skip the boot splash: the user already picked the session, so drop
 		// them straight back into the transcript.
 		m.splash = false
 		const replayMax = 40
-		prior, ctxTok := loadPriorTranscript(resumeID, replayMax)
+		prior, ctxTok := loadPriorTranscript(cfg.ResumeID, replayMax)
 		if len(prior) > 0 {
 			m.entries = append(m.entries, entry{kind: entInfo, text: fmt.Sprintf("— resumed · replaying last %d entries —", len(prior))})
 			m.entries = append(m.entries, prior...)
