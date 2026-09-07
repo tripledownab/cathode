@@ -105,7 +105,7 @@ func main() {
 	// flag with no runtime equivalent, which is why /sysprompt restarts to
 	// change it (sysprompt.go). A failure to write the style file costs the
 	// style, not the session, so report it and keep going.
-	sysArgs, err := sysPromptArgs(loadSettings().SysPrompt)
+	sysArgs, sysPrompt, err := sysPromptArgs(loadSettings().SysPrompt)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "extra system prompt disabled:", err)
 	}
@@ -129,7 +129,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	m := newModel(engine, *mode, approvals, *spin, *resume)
+	m := newModel(engine, *mode, approvals, *spin, *resume, sysPrompt)
 	m.ctxLimit = parseTokenCount(*ctx)
 	// A resumed session may already exceed the base limit; grow it now that the
 	// -ctx flag has set the floor, so the gauge starts honest (see observeCtx).

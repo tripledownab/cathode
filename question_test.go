@@ -86,7 +86,7 @@ func TestAskQuestionSequence(t *testing.T) {
 func TestAskQuestionMultiSelect(t *testing.T) {
 	req := askReq(`{"questions":[{"question":"Which features?","multiSelect":true,"options":[
 		{"label":"Auth"},{"label":"Billing"},{"label":"Search"}]}]}`)
-	m := newModel(&Engine{}, "ask", &Approvals{}, "bar", "")
+	m := newModel(&Engine{}, "ask", &Approvals{}, "bar", "", "")
 	m.splash = false // the splash would eat the first keypress
 
 	next, _ := m.Update(pendingApprovalMsg{req: req})
@@ -123,7 +123,7 @@ func TestAskQuestionMultiSelect(t *testing.T) {
 func TestAskQuestionMultiSelectEnterTakesFocused(t *testing.T) {
 	req := askReq(`{"questions":[{"question":"Which?","multiSelect":true,"options":[
 		{"label":"One"},{"label":"Two"}]}]}`)
-	m := newModel(&Engine{}, "ask", &Approvals{}, "bar", "")
+	m := newModel(&Engine{}, "ask", &Approvals{}, "bar", "", "")
 	m.splash = false
 
 	next, _ := m.Update(pendingApprovalMsg{req: req})

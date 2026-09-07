@@ -128,18 +128,23 @@ func TestSysPromptArgs(t *testing.T) {
 	t.Setenv("CLAUDE_CONFIG_DIR", t.TempDir())
 	noDefaultPrompt(t)
 
-	got, err := sysPromptArgs(false)
-	if got != nil || err != nil {
-		t.Errorf("toggle off: got %v (err %v), want no flag", got, err)
+	got, applied, err := sysPromptArgs(false)
+	if got != nil || applied != "" || err != nil {
+		t.Errorf("toggle off: got %v/%q (err %v), want no flag and no applied text", got, applied, err)
 	}
-	got, err = sysPromptArgs(true)
-	if got != nil || err != nil {
-		t.Errorf("toggle on but no prompt file: got %v (err %v), want no flag", got, err)
+	got, applied, err = sysPromptArgs(true)
+	if got != nil || applied != "" || err != nil {
+		t.Errorf("toggle on but no prompt file: got %v/%q (err %v), want no flag and no applied text", got, applied, err)
 	}
 	writePrompt(t, "Be terse.")
-	got, err = sysPromptArgs(true)
+	got, applied, err = sysPromptArgs(true)
 	if err != nil {
 		t.Fatalf("writing the style file failed: %v", err)
+	}
+	// applied is what the live model reminds against (remind.go), so it has to
+	// be the text the flag selects, not just any non-empty string.
+	if applied != "Be terse." {
+		t.Errorf("applied = %q, want the prompt text the flag selects", applied)
 	}
 	if len(got) != 2 || got[0] != "--settings" {
 		t.Fatalf("got %v, want --settings and a JSON value", got)
@@ -155,6 +160,33 @@ func TestSysPromptArgs(t *testing.T) {
 	}
 	if !strings.Contains(string(b), "Be terse.") {
 		t.Errorf("style file should carry the prompt text, got %q", string(b))
+	}
+}
+
+// The toggle can be on, the file can have text, and still no style reaches
+// claude — writing the style file is allowed to fail, and main starts without
+// the flag. applied has to report that, because it is what newModel stamps into
+// sysPromptSeen: a non-empty value here would have the model remind every turn
+// about an output style claude never loaded (remind.go).
+func TestSysPromptArgsReportsNothingAppliedWhenTheStyleFileFails(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	noDefaultPrompt(t)
+	writePrompt(t, "Be terse.")
+
+	// A regular file where the config dir should be: creating output-styles/
+	// under it fails, which is the failure main reports and keeps going past.
+	blocked := filepath.Join(t.TempDir(), "not-a-dir")
+	if err := os.WriteFile(blocked, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CLAUDE_CONFIG_DIR", blocked)
+
+	args, applied, err := sysPromptArgs(true)
+	if err == nil {
+		t.Fatal("writing the style file into a regular file should fail")
+	}
+	if args != nil || applied != "" {
+		t.Errorf("got %v/%q, want no flag and no applied text", args, applied)
 	}
 }
 
