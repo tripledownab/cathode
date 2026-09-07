@@ -5,6 +5,8 @@ package main
 
 import (
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -135,5 +137,65 @@ func TestCodexLiveGatedActionsAlwaysEndTheTurn(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// A real edit by the real CLI must reach the screen as a diff card.
+//
+// The unit tests use a hunk copied from a recorded session, which proves
+// cathode parses what it was told to expect. This proves codex still sends it.
+func TestCodexLiveEditRendersAsADiffCard(t *testing.T) {
+	if os.Getenv("CATHODE_CODEX_LIVE") == "" {
+		t.Skip("set CATHODE_CODEX_LIVE=1 to run against the real codex CLI")
+	}
+	dir := t.TempDir()
+	target := filepath.Join(dir, "target.txt")
+	if err := os.WriteFile(target, []byte("line one\nline two\nline three\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// build mode: codex runs the edit without asking, so the turn completes.
+	e, err := newCodexEngine(codexEngineConfig{Mode: "build", Cwd: dir})
+	if err != nil {
+		t.Fatalf("spawn: %v", err)
+	}
+	defer e.Close()
+
+	frames := make(chan codexFrame, 256)
+	e.mu.Lock()
+	e.sink = func(f codexFrame) { frames <- f }
+	e.mu.Unlock()
+
+	if err := e.Initialize(); err != nil {
+		t.Fatalf("Initialize: %v", err)
+	}
+	if err := e.Send("In target.txt, change the word two to TWO. Edit the file, nothing else."); err != nil {
+		t.Fatalf("Send: %v", err)
+	}
+
+	m, _ := newTestModel(t, "")
+	deadline := time.After(3 * time.Minute)
+	for {
+		select {
+		case f := <-frames:
+			m.handleCodexEvent(f)
+			if f.Method == "turn/completed" || f.Method == "turn/failed" {
+				for _, en := range m.entries {
+					if en.kind != entDiff {
+						continue
+					}
+					card := stripANSI(renderDiffFor(diffUnified, en.diffs[0], 80))
+					t.Logf("diff card:\n%s", card)
+					if !strings.Contains(card, "TWO") {
+						t.Errorf("the card should show the edit, got:\n%s", card)
+					}
+					return
+				}
+				t.Error("the edit never produced a diff entry")
+				return
+			}
+		case <-deadline:
+			t.Fatal("the turn never ended")
+		}
 	}
 }

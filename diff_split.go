@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 
-	udiff "github.com/aymanbagabas/go-udiff"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -57,19 +56,20 @@ func (m *model) commitDiff(id string) {
 
 // renderDiffFor dispatches to the configured diff style, falling back to the
 // unified card when split is selected but the terminal is too narrow for it.
-func renderDiffFor(style, filename, oldText, newText string, width int) string {
+// The unified text is produced once, here, so both styles render the same diff.
+func renderDiffFor(style string, d fileDiff, width int) string {
+	u := d.unifiedText()
 	if style == diffSplit && width >= splitMinWidth {
-		return renderDiffSplit(filename, oldText, newText, width)
+		return renderDiffSplit(d.file, u, width)
 	}
-	return renderDiff(filename, oldText, newText, width)
+	return renderDiff(d.file, u, width)
 }
 
 // renderDiffSplit builds a side-by-side diff card: deletions (with old line
 // numbers) on the left, additions (new line numbers) on the right, context on
 // both. A change is shown as a removed line beside its added line; unpaired
 // adds/dels leave the opposite column blank.
-func renderDiffSplit(filename, oldText, newText string, width int) string {
-	u := udiff.Unified("a/"+filename, "b/"+filename, oldText, newText)
+func renderDiffSplit(filename, u string, width int) string {
 	if strings.TrimSpace(u) == "" {
 		return dBox.Width(width - 2).Render(dTitle.Render(" "+filename+" ") + "\n" + dCtx.Render("(no changes)"))
 	}

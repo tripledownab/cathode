@@ -18,7 +18,7 @@ func stripANSI(s string) string { return ansiRe.ReplaceAllString(s, "") }
 func TestRenderDiffSplit(t *testing.T) {
 	old := "func add(a, b int) int {\n\treturn a + b\n}\n"
 	neu := "func add(a, b, c int) int {\n\treturn a + b + c\n}\n"
-	out := stripANSI(renderDiffSplit("math.go", old, neu, 100))
+	out := stripANSI(renderDiffSplit("math.go", fileDiff{file: "math.go", old: old, new: neu}.unifiedText(), 100))
 
 	if !strings.Contains(out, "math.go") || !strings.Contains(out, "+2") || !strings.Contains(out, "-2") {
 		t.Fatalf("missing title / counts:\n%s", out)
@@ -57,13 +57,14 @@ func TestDiffCommand(t *testing.T) {
 // renderDiffFor honors the style and falls back to unified when too narrow.
 func TestRenderDiffForFallback(t *testing.T) {
 	old, neu := "a\nb\n", "a\nc\n"
-	if renderDiffFor(diffSplit, "f", old, neu, 60) != renderDiff("f", old, neu, 60) {
+	d := fileDiff{file: "f", old: old, new: neu}
+	if renderDiffFor(diffSplit, d, 60) != renderDiff("f", d.unifiedText(), 60) {
 		t.Error("split below splitMinWidth should fall back to unified")
 	}
-	if renderDiffFor(diffSplit, "f", old, neu, 120) != renderDiffSplit("f", old, neu, 120) {
+	if renderDiffFor(diffSplit, d, 120) != renderDiffSplit("f", d.unifiedText(), 120) {
 		t.Error("split at a wide width should render side-by-side")
 	}
-	if renderDiffFor(diffUnified, "f", old, neu, 120) != renderDiff("f", old, neu, 120) {
+	if renderDiffFor(diffUnified, d, 120) != renderDiff("f", d.unifiedText(), 120) {
 		t.Error("unified style should always render the single-column card")
 	}
 }

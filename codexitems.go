@@ -5,6 +5,7 @@ package main
 
 import (
 	"encoding/json"
+	"path/filepath"
 	"strings"
 )
 
@@ -45,6 +46,19 @@ func (m *model) codexItem(f codexFrame, started bool) {
 		if t := codexReasoningText(p.Item); t != "" {
 			m.add(entThinking, t)
 		}
+	case "fileChange":
+		if !started {
+			return
+		}
+		if head.ID != "" && !m.noteToolCard(head.ID) {
+			return
+		}
+		if ds := codexFileDiffs(p.Item, m.agentCwd); len(ds) > 0 {
+			m.addDiffs(ds)
+			return
+		}
+		m.addTool(head.Type, p.Item)
+
 	default:
 		// A tool item. Its content is on the opening event, and the id pairs it
 		// with the approval request that may follow, so noteToolCard keeps the
@@ -57,6 +71,71 @@ func (m *model) codexItem(f codexFrame, started bool) {
 		}
 		m.addTool(head.Type, p.Item)
 	}
+}
+
+// codexFileDiffs turns an item/fileChange into diff cards.
+//
+// The `diff` field means two different things depending on the kind, which is
+// the whole reason this function exists rather than one assignment:
+//
+//	add     the new file's CONTENT
+//	delete  the removed file's CONTENT
+//	update  an already-computed unified hunk ("@@ -1,3 +1,3 @@ …")
+//
+// All three were confirmed against the live CLI. An update carries no copy of
+// the whole file, so there is no before/after pair to build — it goes through
+// fileDiff.unified, which both renderers accept because they parse unified
+// text anyway.
+func codexFileDiffs(raw json.RawMessage, root string) []fileDiff {
+	var it struct {
+		Changes []struct {
+			Path string `json:"path"`
+			Kind struct {
+				Type string `json:"type"`
+			} `json:"kind"`
+			Diff string `json:"diff"`
+		} `json:"changes"`
+	}
+	if json.Unmarshal(raw, &it) != nil {
+		return nil
+	}
+	var out []fileDiff
+	for _, c := range it.Changes {
+		if c.Path == "" {
+			continue
+		}
+		d := fileDiff{file: codexShortPath(c.Path, root)}
+		switch c.Kind.Type {
+		case "add":
+			d.new = c.Diff
+		case "delete":
+			d.old = c.Diff
+		case "update":
+			d.unified = c.Diff
+		default:
+			continue // an unknown kind: a plain card says more than a blank diff
+		}
+		out = append(out, d)
+	}
+	return out
+}
+
+// codexShortPath trims the session's working root off a change path.
+//
+// codex reports absolute paths. The card title is more readable relative, and
+// a screenshot of a session then carries no home directory. root is what the
+// agent reported for the thread, NOT os.Getwd: those are equal by convention
+// only, and a session rooted elsewhere would render every path in full.
+// Falls back to the original when root is unknown or the path sits outside it.
+func codexShortPath(p, root string) string {
+	if root == "" {
+		return p
+	}
+	rel, err := filepath.Rel(root, p)
+	if err != nil || rel == "" || strings.HasPrefix(rel, "..") {
+		return p
+	}
+	return rel
 }
 
 // codexReasoningText flattens a reasoning item. The summary is what the
