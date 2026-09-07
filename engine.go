@@ -16,12 +16,12 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// Engine wraps a long-lived `claude` subprocess running in bidirectional
+// claudeEngine drives a long-lived `claude` subprocess in bidirectional
 // stream-json mode. It is the *only* place that talks to Claude Code, which
 // keeps the auth story simple: because we never set ANTHROPIC_API_KEY (we
 // actively strip it), claude uses whatever `claude login` established — your
 // Max subscription.
-type Engine struct {
+type claudeEngine struct {
 	cmd    *exec.Cmd
 	stdin  io.WriteCloser
 	stdout io.ReadCloser
@@ -77,8 +77,8 @@ func scrubbedEnv() []string {
 	return out
 }
 
-// NewEngine spawns the subprocess and returns it ready to stream.
-func NewEngine(cfg EngineConfig) (*Engine, error) {
+// newClaudeEngine spawns the subprocess and returns it ready to stream.
+func newClaudeEngine(cfg EngineConfig) (*claudeEngine, error) {
 	args := []string{
 		"-p",
 		"--input-format", "stream-json",
@@ -118,7 +118,7 @@ func NewEngine(cfg EngineConfig) (*Engine, error) {
 	if err := cmd.Start(); err != nil {
 		return nil, err
 	}
-	return &Engine{cmd: cmd, stdin: stdin, stdout: stdout}, nil
+	return &claudeEngine{cmd: cmd, stdin: stdin, stdout: stdout}, nil
 }
 
 // outUser is the NDJSON envelope we write to stdin for each turn. This is the
@@ -140,7 +140,7 @@ type outBlock struct {
 
 // Send writes one user turn to the subprocess. Safe to call from the Bubble Tea
 // update loop.
-func (e *Engine) Send(text string) error {
+func (e *claudeEngine) Send(text string) error {
 	var m outUser
 	m.Type = "user"
 	m.Message.Role = "user"
@@ -165,7 +165,7 @@ func (e *Engine) Send(text string) error {
 // draining p.Send, Pipe stops draining stdout, claude blocks writing and never
 // exits). Post-Run, p.Send is a no-op so Pipe keeps draining and an idle claude
 // exits promptly on stdin EOF; a busy one is killed after a short grace.
-func (e *Engine) Close() {
+func (e *claudeEngine) Close() {
 	if e.stdin != nil {
 		_ = e.stdin.Close() // EOF asks an idle claude to exit cleanly
 	}
@@ -194,7 +194,7 @@ type streamClosedMsg struct{ err error }
 // to the program via p.Send. Run it in its own goroutine after the program is
 // constructed. Using p.Send (rather than a tea.Cmd that blocks on a channel)
 // keeps backpressure simple and lets the UI stay responsive.
-func (e *Engine) Pipe(p *tea.Program) {
+func (e *claudeEngine) Pipe(p *tea.Program) {
 	sc := bufio.NewScanner(e.stdout)
 	sc.Buffer(make([]byte, 0, 64*1024), 8*1024*1024) // tool results can be large
 	for sc.Scan() {
