@@ -72,7 +72,7 @@ func main() {
 	modelID := flag.String("model", "", "pin a model (e.g. sonnet); empty uses account default")
 	spin := flag.String("spinner", "bar", "working throbber: bar | shade | block | arrow | scan")
 	dbg := flag.String("debug", "", "tee raw stream-json and MCP traffic to this logfile")
-	resume := flag.String("resume", "", "claude session id to resume (also set automatically when picking from Ctrl-R)")
+	resume := flag.String("resume", "", "session (claude) or thread (codex) id to resume; also set when picking from Ctrl-R")
 	ctx := flag.String("ctx", "200k", "context window for the pressure gauge — \"200k\", \"500k\", \"1m\", or a raw token count. auto-grows if observed input exceeds it.")
 	flag.Parse()
 

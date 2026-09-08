@@ -1,7 +1,8 @@
 # Building cathode locally
 
-Requirements: **Go 1.22+** and the **`claude` CLI** (logged in with your Pro/Max
-account: `claude login`).
+Requirements: **Go 1.22+** and the CLI of whichever backend you drive — the
+**`claude` CLI** logged in with your Pro/Max account (`claude login`), and/or
+the **`codex` CLI** logged in with ChatGPT (`codex login`) for `-backend codex`.
 
 ```bash
 cd cathode

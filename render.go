@@ -82,7 +82,7 @@ func (m *model) renderEntry(e entry) string {
 	switch e.kind {
 	case entUser:
 		return userBox.Render(cYou.Render(ornBullet+" "+studly("you")) + "\n" + e.text)
-	case entClaude:
+	case entAgent:
 		body := e.text
 		if m.md != nil {
 			if out, err := m.md.Render(e.text); err == nil {

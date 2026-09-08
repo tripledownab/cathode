@@ -37,7 +37,7 @@ func (m *model) codexItem(f codexFrame, started bool) {
 			return // text arrives on completion
 		}
 		if t := strings.TrimSpace(head.Text); t != "" {
-			m.add(entClaude, t)
+			m.add(entAgent, t)
 		}
 	case "reasoning":
 		if started {

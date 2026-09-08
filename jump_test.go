@@ -19,7 +19,7 @@ func jumpModel() model {
 	for _, q := range []string{"first question", "second question", "third question"} {
 		m.entries = append(m.entries,
 			entry{kind: entUser, text: q},
-			entry{kind: entClaude, text: reply})
+			entry{kind: entAgent, text: reply})
 	}
 	m.rebuild()
 	return m

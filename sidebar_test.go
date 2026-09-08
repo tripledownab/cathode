@@ -16,7 +16,7 @@ func TestSidebarPosition(t *testing.T) {
 		m.vp = newTranscriptViewport(100-1-sidebarWidth, 4)
 		m.ready = true
 		m.makeRenderer()
-		m.entries = []entry{{kind: entClaude, text: "the reply"}}
+		m.entries = []entry{{kind: entAgent, text: "the reply"}}
 		m.rebuild()
 		return stripANSI(strings.SplitN(m.renderBody(), "\n", 2)[0]) // first row
 	}

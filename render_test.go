@@ -19,7 +19,7 @@ func TestRebuildRendersMarkdown(t *testing.T) {
 		t.Fatal("glamour renderer not constructed")
 	}
 	m.add(entUser, "fix the bug in **main.go**")
-	m.add(entClaude, "Here's a fix:\n\n```go\nfmt.Println(\"hi\")\n```\n\n- step one\n- step two")
+	m.add(entAgent, "Here's a fix:\n\n```go\nfmt.Println(\"hi\")\n```\n\n- step one\n- step two")
 	m.add(entTool, "Edit\n{\"file\":\"main.go\",\"old\":\"x\",\"new\":\"y\"}")
 	m.add(entInfo, "— done · 0.0012 USD —")
 	out := strings.ToLower(m.vp.View())

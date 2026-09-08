@@ -1,6 +1,7 @@
 # Cathode
 
-*A personal, BBS-styled terminal harness for Claude — running on your Max plan.*
+*A personal, BBS-styled terminal harness for a coding agent — running on your
+subscription, not the API.*
 
 > The binary is `cathode`, the Go module is `ccharness`, and the wordmark renders
 > as `cath0d3` (`appName` in `theme.go`). The repo lives at
@@ -8,22 +9,27 @@
 
 ## What it is
 
-Cathode is a single-binary terminal UI that drives Claude Code. You type, Claude
-works, and the conversation — replies, tool calls, file edits — streams into a
-custom TUI with a 90s bulletin-board aesthetic. It is built for one user (you),
-on a Mac and on Ubuntu, and it bills against your Claude Max subscription rather
-than the pay-per-token API.
+Cathode is a single-binary terminal UI that drives a coding agent's own CLI. You
+type, the agent works, and the conversation — replies, tool calls, file edits —
+streams into a custom TUI with a 90s bulletin-board aesthetic. It is built for
+one user (you), on a Mac and on Ubuntu, and it bills against your subscription
+rather than the pay-per-token API.
+
+Two backends: Claude Code over its stream-json protocol, and codex over its
+`app-server` JSON-RPC (`-backend codex`). The rest of this piece describes the
+claude one, which came first and is the more complete of the two — the codex
+backend is documented in the README.
 
 The design carries a deliberate BBS nod: on a board, a *door* was an external
 program the BBS shelled out to — door games and the like. This does exactly
-that with the `claude` binary (the harness is the board; Claude is the door),
+that with the agent's binary (the harness is the board; the agent is the door),
 which is why the project was first called *Doorway*. *Cathode* keeps the same
 era's glow — the CRT the whole aesthetic is drawn on.
 
 ## The constraint that shaped everything
 
-The whole design follows from one requirement: **use the Max subscription, not
-API billing.** That sounds like a small detail, but it dictates the
+The whole design follows from one requirement: **use the subscription, not API
+billing.** That sounds like a small detail, but it dictates the
 architecture, because there are only two ways software talks to Claude:
 
 The clean way is to drive the official `claude` binary as a subprocess. The

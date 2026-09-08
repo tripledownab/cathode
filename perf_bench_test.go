@@ -38,7 +38,7 @@ func benchModel(n int) model {
 		case 0:
 			m.entries = append(m.entries, entry{kind: entUser, text: fmt.Sprintf("question number %d about the code", i)})
 		case 1:
-			m.entries = append(m.entries, entry{kind: entClaude, text: fmt.Sprintf("Here is a **markdown** reply #%d with a list:\n\n- one\n- two\n- three\n\nand a `code` span.", i)})
+			m.entries = append(m.entries, entry{kind: entAgent, text: fmt.Sprintf("Here is a **markdown** reply #%d with a list:\n\n- one\n- two\n- three\n\nand a `code` span.", i)})
 		case 2:
 			m.entries = append(m.entries, entry{kind: entTool, toolName: "Bash", toolInput: json.RawMessage(`{"command":"go test ./..."}`)})
 		case 3:
@@ -59,7 +59,7 @@ func BenchmarkAddEntry(b *testing.B) {
 		base := benchModel(n)
 		b.Run(fmt.Sprintf("entries=%d", n), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				base.entries = append(base.entries, entry{kind: entClaude, text: "a **new** reply with `code`"})
+				base.entries = append(base.entries, entry{kind: entAgent, text: "a **new** reply with `code`"})
 				base.rebuild()
 			}
 		})

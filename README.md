@@ -1,6 +1,8 @@
 # Cathode
 
-A **Bubble Tea TUI over the Claude Code stream-json protocol** (wordmark: `cath0d3`).
+A **Bubble Tea TUI over an agent CLI's own protocol** (wordmark: `cath0d3`).
+Drives `claude` over Claude Code stream-json, or `codex` over its `app-server`
+JSON-RPC — see [Backends](#backends).
 
 <p align="center">
   <img src="assets/cathode-splash.svg" alt="cath0d3 boot splash" width="640"><br><br>
@@ -10,22 +12,26 @@ A **Bubble Tea TUI over the Claude Code stream-json protocol** (wordmark: `cath0
 <sub>Rendered in the built-in **Catppuccin Mocha** theme — the look is switchable, see <a href="#themes">Themes</a>.</sub>
 
 The agent loop, context management, tool execution, and auth all live in the
-official `claude` binary, which runs as a long-lived subprocess. This program
-owns only the terminal UI and the stdin/stdout plumbing — so you build your own
-experience without re-implementing an agent, and you ride your **Max
-subscription** because we never set an API key.
+official vendor binary, which runs as a long-lived subprocess. This program owns
+only the terminal UI and the stdin/stdout plumbing — so you build your own
+experience without re-implementing an agent, and you ride your **subscription**
+because we never set an API key.
 
 ## Features
 
-- **Rides your Pro/Max subscription** — drives the real `claude` CLI as a subprocess and scrubs `ANTHROPIC_API_KEY` / `ANTHROPIC_AUTH_TOKEN` from its env, so it never silently falls back to API billing.
+This list describes the claude backend, which is the complete one. The codex
+backend shares the UI but not all of it — [Backends](#backends) says exactly
+what differs.
+
+- **Rides your subscription** — drives the real vendor CLI as a subprocess and scrubs the API-key variables from its env, so it never silently falls back to API billing. Pro/Max on claude, ChatGPT on codex.
 - **Four permission modes** — `plan`, `ask`, `build` (auto-accept edits), `bypass`; cycle with `shift+tab` or `/mode`.
 - **Inline approvals** — in `ask` mode every gated tool call raises a `[ENTER] allow · [ESC] deny` bar (served by a hand-rolled in-process MCP permission server); edits show the diff before you decide.
-- **Answers Claude's questions** — when Claude asks (its `AskUserQuestion` tool), the options pop up as a picker to choose from — always presented (never auto-approved, even in `build`/`bypass`), so a question actually waits for your answer instead of erroring out.
+- **Answers the agent's questions** — when claude asks (its `AskUserQuestion` tool), the options pop up as a picker to choose from — always presented (never auto-approved, even in `build`/`bypass`), so a question actually waits for your answer instead of erroring out.
 - **Visual diff cards** — `Edit` / `Write` / `MultiEdit` render as line-numbered red/green diffs instead of raw JSON, unified or side-by-side **split** (`/diff` or `/settings`).
-- **Markdown replies** — Claude's output is rendered with Glamour and reflows on resize.
+- **Markdown replies** — the agent's output is rendered with Glamour and reflows on resize.
 - **Clickable links** — `http(s)` URLs in the transcript are wrapped as OSC 8 terminal hyperlinks (Cmd/Ctrl-click, or a plain click with `/mouse` off).
 - **Extended thinking** — the model's reasoning renders dim above its reply; a hook that blocks or fails surfaces too (routine ones stay quiet).
-- **Session resume** — `ctrl+r` (or `/sessions`) fuzzy-filters `claude`'s own session history and re-execs into the one you pick.
+- **Session resume** — `ctrl+r` (or `/sessions`) fuzzy-filters your session history for the running backend and re-execs into the one you pick.
 - **Command palette** — `ctrl+t` (or `/commands`) browses every command — our in-process ones plus claude's built-ins, **skills**, and **plugin** commands (from the init handshake) — and runs or forwards the one you pick; `/agents` lists subagents. Any `/command` we don't own is forwarded to claude, so custom & plugin commands work.
 - **11 themes + header animations** — `/theme` and `/settings`, with live preview, persisted across launches (see [Themes](#themes)).
 - **Live status bar** — permission mode, session id, git branch, a context-pressure gauge that auto-grows 200K → 2M, output tokens, and running cost.
@@ -33,15 +39,16 @@ subscription** because we never set an API key.
 - **Bring your own tools** — point `-mcp` at a `.mcp.json` to wire extra MCP tools alongside the built-in approvals server.
 - **Multi-line input** — Enter sends; insert a line break with `Alt+Enter`, `Ctrl+J`, or a trailing `\`. The prompt grows with your draft — line breaks *and* soft-wrap in narrow windows — up to 8 rows, then scrolls.
 - **Jump back through your prompts** — `Shift+↑` / `Shift+↓` scroll the transcript one *turn* at a time, parking each of your past prompts at the top of the view; stepping past the newest one drops you back at the live bottom.
-- **Prompt history & steering** — `↑` / `↓` recalls past prompts (use `Ctrl+↑/↓` while composing a multi-line draft, where `↑/↓` move between lines); type while Claude is busy and the message is injected into the running turn, so you can course-correct mid-flight instead of waiting for it to finish (`Esc` interrupts the turn to undo a mis-sent steer).
+- **Prompt history & steering** — `↑` / `↓` recalls past prompts (use `Ctrl+↑/↓` while composing a multi-line draft, where `↑/↓` move between lines); type while the agent is busy and the message is injected into the running turn, so you can course-correct mid-flight instead of waiting for it to finish (`Esc` interrupts the turn to undo a mis-sent steer).
 
 ## Why this architecture (vs forking Crush/OpenCode)
 
 Those are native API-client agents: to use Max they route a subscription OAuth
 token through the API, the pattern Anthropic restricted in early 2026. Here the
-engine *is* Claude Code, so subscription use stays inside its intended path. We
-borrow their **TUI craft** (all MIT-licensed) — markdown rendering, message
-cards, plan/build modes — not their engine.
+engine *is* the vendor's own CLI — Claude Code, or codex — so subscription use
+stays inside its intended path, and the same argument holds for both. We borrow
+their **TUI craft** (all MIT-licensed) — markdown rendering, message cards,
+plan/build modes — not their engine.
 
 ## Run it
 
@@ -49,10 +56,13 @@ cards, plan/build modes — not their engine.
 claude login            # one-time, with your Pro/Max credentials only
 go mod download         # fetch deps (go.sum is checked in)
 go run .                # AUTO (build) by default; -mode ask | plan | bypass to switch
+go run . -backend codex # or drive codex instead (needs `codex login`)
 ```
 
 Preflight: run `claude` once interactively and confirm `/status` shows the
-subscription route (not API credits) before relying on this.
+subscription route (not API credits) before relying on this. On codex, run
+`codex exec` once — `codex login status` reports stored state and claims success
+even when the token has expired, so it is not a check.
 
 ## Build & install
 
@@ -150,7 +160,11 @@ Small files by responsibility (the project keeps each one scannable).
 | file | role |
 |------|------|
 | `main.go` | flags, mode→permission mapping, wires engine + Bubble Tea program + reader goroutine |
+| `backend.go` | the `Engine` seam: the calls the UI makes, and nothing about the wire format |
+| `backendpick.go` | picks the backend `-backend` asked for; the only file that knows both exist |
 | `engine.go` | the long-lived `claude` subprocess: spawn, env-scrub, bidirectional NDJSON stdin/stdout |
+| `codex*.go` | the codex backend: JSON-RPC framing, thread and turn lifecycle, event adapter |
+| `agentname.go` | every user-visible mention of the agent, so a label cannot name the wrong one |
 | `events.go` | `Envelope` structs + parser for the stream-json output |
 | `control.go` | control-request envelopes on stdin (set permission mode, interrupt) |
 | `stream.go` | routes one parsed envelope into the model (`handleEvent`) |
@@ -195,7 +209,7 @@ Small files by responsibility (the project keeps each one scannable).
 | `commands.go` | the slash-command table + help modal |
 | `settings.go` | persisted settings (header / theme / fps / diff / sidebar) + their pickers |
 | `approvals.go` | the in-process MCP permission server (`--permission-prompt-tool`) |
-| `question.go` | intercepts Claude's `AskUserQuestion` and answers it via a picker |
+| `question.go` | intercepts claude's `AskUserQuestion` and answers it via a picker |
 
 **State & persistence**
 
@@ -218,7 +232,7 @@ splash (`splash.go`) opens with the wordmark, a faux modem handshake, and a
 `press [ENTER] to logon` prompt (dismissed by the first keypress).
 
 Discipline: the leet/studly/ornament treatment runs on *chrome only* — banner,
-dividers, status, labels, splash. Claude's replies and the diff code stay
+dividers, status, labels, splash. The agent's replies and the diff code stay
 plain and readable. The `leet`, `studly`, `flavor`, and `sceneDivider` helpers
 live in `text.go`; reskin by adding or editing a palette row (ten colors) in
 `theme.go` — that's how all 12 built-in themes are defined (see
@@ -234,7 +248,7 @@ The splash shows one of several wide block logos at random each launch
 variant by running `figlet -f <font> -w 200 "cath0d3" | tr '\140' "'"` (any
 font — `colossal`, `epic`, `poison`, `cosmic`, or `toilet -f pagga` for
 shade-block CP437) and pasting the output as a new entry; narrow terminals fall
-back to the compact `logoCompact`. While Claude works, an animated throbber runs in the
+back to the compact `logoCompact`. While the agent works, an animated throbber runs in the
 status bar; choose its frames with `-spinner` (the `shade` pulse `░▒▓█` and the
 `scan` knight-rider are the most period-correct).
 
@@ -244,7 +258,7 @@ Done: markdown rendering (Glamour), bordered message cards, plan/build/ask
 modes, MCP tool-wiring hook, visual diff cards for `Edit`/`Write`/`MultiEdit`
 (unified and side-by-side split), the inline permission/approval pane (in `ask`
 mode each gated tool routes through our in-process MCP server and raises an
-`[ENTER] allow / [ESC] deny` bar, diffs shown first), Claude's questions
+`[ENTER] allow / [ESC] deny` bar, diffs shown first), the agent's questions
 answered via a picker, multi-line input, session resume, 11 themes, extended
 thinking, clickable links, slash-command forwarding (skills & plugins), and the
 merged command palette.
@@ -253,7 +267,7 @@ Next / deferred: (a) token-by-token streaming via `--include-partial-messages` (
 off against markdown); (b) syntax-token highlighting inside the diff — chroma is
 already in the tree via glamour, so per-line token coloring on top of the red/
 green background is a natural follow-on; (c) multi-select and free-text "Other"
-answers for Claude's questions (single-select works today).
+answers for the agent's questions (single-select works today).
 
 ## Known sharp edges
 
@@ -261,6 +275,11 @@ answers for Claude's questions (single-select works today).
   the protocol; its shape matches the Agent SDK streaming-input format.
 - `ANTHROPIC_API_KEY` / `ANTHROPIC_AUTH_TOKEN` are stripped from the subprocess
   env on purpose — either present would silently bill the API.
+- On codex, `OPENAI_API_KEY` and `OPENAI_BASE_URL` are stripped for symmetry.
+  The key is belt-and-braces there: codex reads its credential from
+  `~/.codex/auth.json` and an environment key does not divert billing, verified
+  by probe. `OPENAI_BASE_URL` is the one that matters, because it decides which
+  host the conversation is sent to.
 - `CLAUDE_CODE_CHILD_SESSION` is stripped too. It is set inside a running Claude
   Code session and marks children as subsessions, which turns transcript saving
   off — so cathode started from inside one would leave `ctrl+r` empty and
