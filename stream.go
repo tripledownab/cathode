@@ -106,7 +106,7 @@ func (m *model) handleEvent(e Envelope) {
 			switch b.Type {
 			case "text":
 				if t := strings.TrimSpace(b.Text); t != "" {
-					m.add(entClaude, t)
+					m.add(entAgent, t)
 				}
 			case "thinking":
 				// Extended thinking — show it (dim) when present; many turns carry

@@ -111,7 +111,7 @@ func previewModel(banner string) model {
 	}
 	m.entries = []entry{
 		{kind: entUser, text: "refactor add() to take a third arg and update the caller"},
-		{kind: entClaude, text: "Here's the change to both the function and its caller:"},
+		{kind: entAgent, text: "Here's the change to both the function and its caller:"},
 		{kind: entDiff, diffs: []fileDiff{{
 			file: "math.go",
 			old:  "func add(a, b int) int {\n\treturn a + b\n}",

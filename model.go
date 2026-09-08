@@ -24,8 +24,8 @@ import (
 type entryKind int
 
 const (
-	entUser entryKind = iota
-	entClaude
+	entUser  entryKind = iota
+	entAgent           // an assistant reply, from whichever backend is running
 	entThinking
 	entTool
 	entToolResult

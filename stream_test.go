@@ -15,7 +15,7 @@ func TestThinkingBlocks(t *testing.T) {
 	if len(m.entries) != 2 {
 		t.Fatalf("want a thinking + a claude entry, got %d", len(m.entries))
 	}
-	if m.entries[0].kind != entThinking || m.entries[1].kind != entClaude {
+	if m.entries[0].kind != entThinking || m.entries[1].kind != entAgent {
 		t.Fatalf("kinds: got %v,%v want thinking,claude", m.entries[0].kind, m.entries[1].kind)
 	}
 
@@ -24,7 +24,7 @@ func TestThinkingBlocks(t *testing.T) {
 		{Type: "thinking", Thinking: "  "}, // empty after trim → skipped
 		{Type: "text", Text: "hi"},
 	}}})
-	if len(m2.entries) != 1 || m2.entries[0].kind != entClaude {
+	if len(m2.entries) != 1 || m2.entries[0].kind != entAgent {
 		t.Fatalf("empty thinking should be skipped, got %d entries", len(m2.entries))
 	}
 }

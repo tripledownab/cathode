@@ -201,8 +201,8 @@ func TestCodexAdapterMapsFramesToEntries(t *testing.T) {
 		Params: json.RawMessage(`{"item":{"type":"agentMessage","id":"m1","text":"hello there"}}`),
 	})
 	last := m.entries[len(m.entries)-1]
-	if last.kind != entClaude || last.text != "hello there" {
-		t.Errorf("agent message = %+v, want entClaude", last)
+	if last.kind != entAgent || last.text != "hello there" {
+		t.Errorf("agent message = %+v, want entAgent", last)
 	}
 
 	// The user's own turn is already in the transcript; echoing it would double it.

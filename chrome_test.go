@@ -78,7 +78,7 @@ func TestFrameFitsHeight(t *testing.T) {
 		m.resizeViewport()
 		m.makeRenderer()
 		for i := 0; i < 80; i++ {
-			m.add(entClaude, "streamed assistant output line")
+			m.add(entAgent, "streamed assistant output line")
 		}
 		m.busy = true
 		m.resizeViewport()

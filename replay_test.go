@@ -107,7 +107,7 @@ func TestLoadPriorTranscriptHidesMeta(t *testing.T) {
 		{kind: entUser, text: "commit to 81"},
 		{kind: entUser, text: "/compact"},
 		{kind: entInfo, text: compactDoneText},
-		{kind: entClaude, text: "picking up #42"},
+		{kind: entAgent, text: "picking up #42"},
 	}
 	if len(entries) != len(want) {
 		t.Fatalf("entries = %d, want %d: %+v", len(entries), len(want), entries)
@@ -148,7 +148,7 @@ func TestLoadPriorTranscriptAutoCompact(t *testing.T) {
 	want := []entry{
 		{kind: entUser, text: "carry on"},
 		{kind: entInfo, text: compactDoneText},
-		{kind: entClaude, text: "on it"},
+		{kind: entAgent, text: "on it"},
 	}
 	if len(entries) != len(want) {
 		t.Fatalf("entries = %d, want %d: %+v", len(entries), len(want), entries)

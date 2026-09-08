@@ -148,7 +148,7 @@ func loadPriorTranscript(sessionID string, maxEntries int) (entries []entry, ctx
 				}
 				flushCompact()
 				if t := strings.TrimSpace(c.Text); t != "" {
-					entries = append(entries, entry{kind: entClaude, text: t})
+					entries = append(entries, entry{kind: entAgent, text: t})
 				}
 			case "tool_use":
 				flushCompact()
