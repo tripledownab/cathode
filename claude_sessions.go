@@ -109,10 +109,21 @@ func firstText(raw json.RawMessage) string {
 // store-only entries (matching the cwd filter) as a fallback. Empty cwd
 // disables the store filter and skips the filesystem source, which the tests
 // use to assert pure store behaviour.
-func sessionItems(s *sessionStore, cwd string) []pickerItem {
-	merged := mergeWithStore(listClaudeSessions(cwd), s, cwd)
+func sessionItems(s *sessionStore, cwd, backend string) []pickerItem {
+	// Only claude keeps per-project session JSONLs, so the filesystem source is
+	// claude's alone. Offering those rows on another backend is not a cosmetic
+	// mismatch: resuming one hands a claude session id to a CLI that has never
+	// seen it, and the handshake fails.
+	var fs []sessionInfo
+	if sessionBackend(backend) == backendClaude {
+		fs = listClaudeSessions(cwd)
+	}
+	merged := mergeWithStore(fs, s, cwd)
 	items := make([]pickerItem, 0, len(merged))
 	for _, e := range merged {
+		if sessionBackend(e.Backend) != sessionBackend(backend) {
+			continue
+		}
 		title := short(e.ID)
 		if e.First != "" {
 			title = short(e.ID) + "  " + e.First

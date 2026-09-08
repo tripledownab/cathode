@@ -18,6 +18,7 @@ package main
 // questions.
 type launchConfig struct {
 	Engine    Engine
+	Backend   string     // claude | codex; names the agent on screen (agentname.go)
 	Approvals *Approvals // nil when nothing is gated (bypass mode)
 	Mode      string     // ask | plan | build | bypass
 	Spinner   string     // throbber style id

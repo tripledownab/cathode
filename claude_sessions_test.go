@@ -88,11 +88,11 @@ func TestSessionItemsMergesClaudeAndStore(t *testing.T) {
 
 	s := newTestStore(t)
 	// Store-only entry for the same cwd — must still show up.
-	s.Touch("storeonly", "sonnet", cwd, "prior prompt", time.Date(2026, 6, 14, 0, 0, 0, 0, time.UTC))
+	s.Touch("storeonly", "sonnet", cwd, "prior prompt", backendClaude, time.Date(2026, 6, 14, 0, 0, 0, 0, time.UTC))
 	// Different cwd — must be filtered out.
-	s.Touch("elsewhere", "sonnet", "/work/repoB", "other", time.Date(2026, 6, 14, 0, 0, 0, 0, time.UTC))
+	s.Touch("elsewhere", "sonnet", "/work/repoB", "other", backendClaude, time.Date(2026, 6, 14, 0, 0, 0, 0, time.UTC))
 
-	items := sessionItems(s, cwd)
+	items := sessionItems(s, cwd, backendClaude)
 	ids := map[string]bool{}
 	for _, it := range items {
 		ids[it.id] = true

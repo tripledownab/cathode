@@ -23,7 +23,7 @@ func newTestStore(t *testing.T) *sessionStore {
 func TestSessionTouchUpsertsAndBumps(t *testing.T) {
 	s := newTestStore(t)
 	t0 := time.Date(2026, 6, 15, 10, 0, 0, 0, time.UTC)
-	s.Touch("abc123", "sonnet", "/work/repo", "fix the bug", t0)
+	s.Touch("abc123", "sonnet", "/work/repo", "fix the bug", backendClaude, t0)
 
 	got := s.entries["abc123"]
 	if got.Model != "sonnet" || got.Cwd != "/work/repo" || got.First != "fix the bug" {
@@ -32,7 +32,7 @@ func TestSessionTouchUpsertsAndBumps(t *testing.T) {
 
 	// Empty-field follow-up: must not overwrite existing values, must bump time.
 	t1 := t0.Add(5 * time.Minute)
-	s.Touch("abc123", "", "", "", t1)
+	s.Touch("abc123", "", "", "", backendClaude, t1)
 	got = s.entries["abc123"]
 	if got.Model != "sonnet" || got.Cwd != "/work/repo" || got.First != "fix the bug" {
 		t.Fatalf("follow-up Touch clobbered metadata: %+v", got)
@@ -45,9 +45,9 @@ func TestSessionTouchUpsertsAndBumps(t *testing.T) {
 // TestSessionAllSortsByRecency pins that the picker gets newest-first ordering.
 func TestSessionAllSortsByRecency(t *testing.T) {
 	s := newTestStore(t)
-	s.Touch("older", "m", "/a", "p1", time.Date(2026, 6, 14, 0, 0, 0, 0, time.UTC))
-	s.Touch("middle", "m", "/b", "p2", time.Date(2026, 6, 15, 0, 0, 0, 0, time.UTC))
-	s.Touch("newest", "m", "/c", "p3", time.Date(2026, 6, 16, 0, 0, 0, 0, time.UTC))
+	s.Touch("older", "m", "/a", "p1", backendClaude, time.Date(2026, 6, 14, 0, 0, 0, 0, time.UTC))
+	s.Touch("middle", "m", "/b", "p2", backendClaude, time.Date(2026, 6, 15, 0, 0, 0, 0, time.UTC))
+	s.Touch("newest", "m", "/c", "p3", backendClaude, time.Date(2026, 6, 16, 0, 0, 0, 0, time.UTC))
 
 	got := s.All()
 	if len(got) != 3 {
@@ -64,12 +64,12 @@ func TestSessionAllSortsByRecency(t *testing.T) {
 func TestSessionItemsFiltersByCwd(t *testing.T) {
 	s := newTestStore(t)
 	t0 := time.Date(2026, 6, 15, 10, 0, 0, 0, time.UTC)
-	s.Touch("here1", "m", "/work/repoA", "p", t0)
-	s.Touch("here2", "m", "/work/repoA/", "p", t0) // trailing slash → same after Clean
-	s.Touch("other", "m", "/work/repoB", "p", t0)
-	s.Touch("legacy", "m", "", "p", t0) // pre-cwd entry
+	s.Touch("here1", "m", "/work/repoA", "p", backendClaude, t0)
+	s.Touch("here2", "m", "/work/repoA/", "p", backendClaude, t0) // trailing slash → same after Clean
+	s.Touch("other", "m", "/work/repoB", "p", backendClaude, t0)
+	s.Touch("legacy", "m", "", "p", backendClaude, t0) // pre-cwd entry
 
-	items := sessionItems(s, "/work/repoA")
+	items := sessionItems(s, "/work/repoA", backendClaude)
 	if len(items) != 2 {
 		t.Fatalf("len=%d, want 2 (here1, here2); got %+v", len(items), items)
 	}
@@ -85,7 +85,7 @@ func TestSessionItemsFiltersByCwd(t *testing.T) {
 	}
 
 	// Empty cwd disables the filter — used by tests that don't care about it.
-	if len(sessionItems(s, "")) != 4 {
+	if len(sessionItems(s, "", backendClaude)) != 4 {
 		t.Fatalf("empty-cwd filter should return all entries")
 	}
 }
@@ -140,4 +140,42 @@ func sameArgv(a, b []string) bool {
 		}
 	}
 	return true
+}
+
+// The picker must only offer sessions this backend can actually resume.
+//
+// Handing a claude session id to codex is not a cosmetic mismatch: thread/resume
+// has never seen that id and the handshake fails. Records written before cathode
+// had a second backend carry no backend at all, and those are claude's.
+func TestSessionItemsFilterByBackend(t *testing.T) {
+	s := newTestStore(t)
+	const cwd = "/work/repo"
+	t0 := time.Date(2026, 6, 14, 0, 0, 0, 0, time.UTC)
+	s.Touch("claude-one", "sonnet", cwd, "p", backendClaude, t0)
+	s.Touch("codex-one", "gpt-x", cwd, "p", backendCodex, t0)
+	s.Touch("legacy", "sonnet", cwd, "p", "", t0) // pre-dates the field
+
+	ids := func(backend string) map[string]bool {
+		out := map[string]bool{}
+		for _, it := range sessionItems(s, cwd, backend) {
+			out[it.id] = true
+		}
+		return out
+	}
+
+	c := ids(backendClaude)
+	if !c["claude-one"] || !c["legacy"] {
+		t.Errorf("claude picker = %v, want its own session and the untagged one", c)
+	}
+	if c["codex-one"] {
+		t.Error("claude picker offers a codex thread")
+	}
+
+	x := ids(backendCodex)
+	if !x["codex-one"] {
+		t.Errorf("codex picker = %v, want its own thread", x)
+	}
+	if x["claude-one"] || x["legacy"] {
+		t.Errorf("codex picker offers claude sessions: %v", x)
+	}
 }

@@ -89,7 +89,7 @@ func (m *model) renderEntry(e entry) string {
 				body = strings.TrimRight(out, "\n")
 			}
 		}
-		return cName.Render(ornBullet+" "+studly("claude")) + "\n" + body
+		return cName.Render(ornBullet+" "+studly(agentName(m.backend))) + "\n" + body
 	case entThinking:
 		// Extended thinking: dim + italic so it reads as the model's scratch work,
 		// visually subordinate to the actual reply.

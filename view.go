@@ -26,7 +26,7 @@ func (m model) View() string {
 		return placeOverlay(bg, m.picker.View(), m.w, m.h)
 	}
 	if m.help {
-		return placeOverlay(bg, helpModalView(m.w, m.h), m.w, m.h)
+		return placeOverlay(bg, helpModalView(m.w, m.h, m.backend), m.w, m.h)
 	}
 	// The inline @-file menu floats just above the prompt rather than centered:
 	// its last row sits on the line above the prompt (banner+divider+viewport is
@@ -52,7 +52,7 @@ func (m model) renderBackground() string {
 	prompt := m.input.View()
 	if m.pending != nil {
 		prompt = approveBar.Render(fmt.Sprintf(" ►◄ %s  %s    [ENTER] %s (default)    [ESC] %s ◄► ",
-			studly("claude wants:"), strings.ToUpper(m.pending.toolName),
+			studly(agentName(m.backend)+" wants:"), strings.ToUpper(m.pending.toolName),
 			leet("ALLOW"), leet("DENY")))
 	}
 
@@ -68,7 +68,7 @@ func (m model) renderBackground() string {
 	var parts []string
 	if m.topChromeRows() > 0 {
 		parts = append(parts,
-			bbsBanner(m.w, m.colorPhase, m.headerStyle),
+			bbsBanner(m.w, m.colorPhase, m.headerStyle, m.backend),
 			sceneDivider(leet("session"), m.w),
 		)
 	}

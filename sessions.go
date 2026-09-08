@@ -22,6 +22,19 @@ type sessionInfo struct {
 	Cwd      string    `json:"cwd"`
 	LastUsed time.Time `json:"last_used"`
 	First    string    `json:"first,omitempty"` // truncated first user prompt, if known
+	// Backend is which agent CLI owns this id. Empty means claude: every record
+	// written before cathode had a second backend is one of its sessions, so the
+	// zero value is the right default and no migration is needed.
+	Backend string `json:"backend,omitempty"`
+}
+
+// sessionBackend normalises a stored value. Kept as one function because the
+// empty-means-claude rule is read in two places and must not drift.
+func sessionBackend(v string) string {
+	if v == "" {
+		return backendClaude
+	}
+	return v
 }
 
 // sessionStore is the on-disk session index, persisted as JSONL at
@@ -67,7 +80,7 @@ func (s *sessionStore) load() {
 // Touch upserts a session. Empty model/cwd/first don't overwrite existing
 // values (so a follow-up Touch carrying only LastUsed preserves prior
 // metadata). LastUsed is always bumped.
-func (s *sessionStore) Touch(id, model, cwd, first string, now time.Time) {
+func (s *sessionStore) Touch(id, model, cwd, first, backend string, now time.Time) {
 	if id == "" {
 		return
 	}
@@ -75,6 +88,9 @@ func (s *sessionStore) Touch(id, model, cwd, first string, now time.Time) {
 	defer s.mu.Unlock()
 	cur := s.entries[id]
 	cur.ID = id
+	if backend != "" {
+		cur.Backend = backend
+	}
 	if model != "" {
 		cur.Model = model
 	}

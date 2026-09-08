@@ -60,6 +60,7 @@ type bodyKey struct {
 // external services up top, modal flags, widgets, then session/turn state.
 type model struct {
 	engine    Engine
+	backend   string // which agent CLI is being driven; see agentname.go
 	approvals *Approvals
 	md        *glamour.TermRenderer
 	hist      *history
@@ -195,9 +196,9 @@ type model struct {
 // its config so tests exercise the real keymap: Enter is reserved for sending
 // (handled in handleEnter), so the textarea's newline binding is rebound to
 // alt+enter / ctrl+j (plus a trailing "\" + enter — see handleEnter).
-func newPromptArea() textarea.Model {
+func newPromptArea(backend string) textarea.Model {
 	ta := textarea.New()
-	ta.Placeholder = "Ask Claude…  (enter sends · alt+enter / ctrl+j / \\↵ for a new line)"
+	ta.Placeholder = promptPlaceholder(backend)
 	ta.Prompt = "› "
 	ta.CharLimit = 0
 	// MaxHeight caps the *content*, not the display: bubbles defaults it to 99
@@ -219,7 +220,7 @@ func (m *model) setPromptWidth(w int) {
 }
 
 func newModel(cfg launchConfig) model {
-	ta := newPromptArea()
+	ta := newPromptArea(cfg.Backend)
 	ta.Focus()
 
 	sp := spinner.New()
@@ -233,7 +234,7 @@ func newModel(cfg launchConfig) model {
 	st := loadSettings()
 	applyTheme(st.Theme) // re-skin all styles to the persisted theme before first paint
 	m := model{
-		engine: cfg.Engine, approvals: cfg.Approvals,
+		engine: cfg.Engine, backend: cfg.Backend, approvals: cfg.Approvals,
 		hist:     openHistory(),
 		sessions: openSessionStore(),
 		input:    ta, sp: sp,

@@ -104,7 +104,7 @@ func TestJumpPromptStopsAtTop(t *testing.T) {
 func TestJumpPromptEmpty(t *testing.T) {
 	m := model{w: 60, h: 24, ready: true, follow: true}
 	m.vp = newTranscriptViewport(58, 6)
-	m.input = newPromptArea()
+	m.input = newPromptArea(backendClaude)
 	m.jumpPrompt(-1)
 	if _, _, handled := m.handleKey(tea.KeyMsg{Type: tea.KeyShiftUp}); !handled {
 		t.Error("shift+up should be consumed by the jump handler")

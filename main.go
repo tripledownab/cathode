@@ -133,6 +133,7 @@ func main() {
 
 	m := newModel(launchConfig{
 		Engine:    engine,
+		Backend:   *backend,
 		Approvals: approvals,
 		Mode:      *mode,
 		Spinner:   *spin,

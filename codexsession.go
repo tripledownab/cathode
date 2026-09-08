@@ -26,7 +26,47 @@ func (e *codexEngine) Initialize() error {
 	if err := e.notify("initialized", map[string]any{}); err != nil {
 		return err
 	}
-	return e.openThread()
+	if err := e.openThread(); err != nil {
+		return err
+	}
+	// The model list is a request, not part of the stream, so it cannot reach
+	// the UI the way claude's does (its list rides the initialize reply, which
+	// the adapter already sees). Fetch it and forward it as a frame, so the
+	// picker is populated by the same path either way. Non-blocking: a session
+	// works without it, and `fire` surfaces a failure rather than hiding it.
+	return e.fire("model/list", map[string]any{}, e.emitModels)
+}
+
+// emitModels turns a model/list reply into the frame the adapter consumes.
+// Hidden entries are dropped: codex marks superseded models that way, and the
+// picker should offer what the CLI itself would offer.
+func (e *codexEngine) emitModels(res json.RawMessage) {
+	var out struct {
+		Data []struct {
+			ID          string `json:"id"`
+			DisplayName string `json:"displayName"`
+			Description string `json:"description"`
+			Hidden      bool   `json:"hidden"`
+		} `json:"data"`
+	}
+	if json.Unmarshal(res, &out) != nil {
+		return
+	}
+	models := make([]ModelChoice, 0, len(out.Data))
+	for _, m := range out.Data {
+		if m.Hidden || m.ID == "" {
+			continue
+		}
+		models = append(models, ModelChoice{Value: m.ID, DisplayName: m.DisplayName, Description: m.Description})
+	}
+	if len(models) == 0 {
+		return
+	}
+	b, err := json.Marshal(models)
+	if err != nil {
+		return
+	}
+	e.emit(codexFrame{Method: codexModelsMethod, Params: b})
 }
 
 // openThread starts a fresh thread, or resumes one when main was given an id.

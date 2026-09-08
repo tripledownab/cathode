@@ -199,3 +199,55 @@ func TestCodexLiveEditRendersAsADiffCard(t *testing.T) {
 		}
 	}
 }
+
+// The /model picker must offer codex's own models, not claude's aliases.
+// model/list is a request, so the list reaches the UI as a fetched frame; this
+// checks that round trip against the real catalogue.
+func TestCodexLiveModelListReachesThePicker(t *testing.T) {
+	if os.Getenv("CATHODE_CODEX_LIVE") == "" {
+		t.Skip("set CATHODE_CODEX_LIVE=1 to run against the real codex CLI")
+	}
+	e, err := newCodexEngine(codexEngineConfig{Mode: "plan", Cwd: t.TempDir()})
+	if err != nil {
+		t.Fatalf("spawn: %v", err)
+	}
+	defer e.Close()
+
+	frames := make(chan codexFrame, 64)
+	e.mu.Lock()
+	e.sink = func(f codexFrame) { frames <- f }
+	e.mu.Unlock()
+
+	if err := e.Initialize(); err != nil {
+		t.Fatalf("Initialize: %v", err)
+	}
+
+	m, _ := newTestModel(t, "")
+	m.backend = backendCodex
+	deadline := time.After(30 * time.Second)
+	for {
+		select {
+		case f := <-frames:
+			m.handleCodexEvent(f)
+			if f.Method != codexModelsMethod {
+				continue
+			}
+			items := m.modelItems()
+			if len(items) == 0 {
+				t.Fatal("the model frame arrived but the picker is empty")
+			}
+			for _, it := range items {
+				t.Logf("model row: %s — %s", it.title, it.subtitle)
+				switch it.id {
+				case "opus", "sonnet", "haiku":
+					t.Errorf("codex picker offers claude's %q", it.id)
+				case "":
+					t.Error("a row with no id cannot be selected")
+				}
+			}
+			return
+		case <-deadline:
+			t.Fatal("no model list within the deadline")
+		}
+	}
+}

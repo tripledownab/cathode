@@ -203,7 +203,7 @@ func slashCommands() []slashCmd {
 			desc: "resume a previous session",
 			exec: func(m *model, _ string) (model, tea.Cmd) {
 				cwd, _ := os.Getwd()
-				m.picker = newPicker("sessions", "RESUME SESSION", sessionItems(m.sessions, cwd), m.w, m.h)
+				m.picker = newPicker("sessions", "RESUME SESSION", sessionItems(m.sessions, cwd, m.backend), m.w, m.h)
 				return *m, nil
 			},
 		},
