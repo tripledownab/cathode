@@ -84,7 +84,7 @@ func centerBlock(lines []string, width int, style lipgloss.Style) []string {
 // modem handshake, a scene divider, a SAUCE-style credit, and a logon prompt.
 // Sections reveal one frame at a time so the boot looks like a real modem
 // negotiation; the first keypress dismisses it regardless of progress.
-func splashScreen(width, height, frame, logoIdx int) string {
+func splashScreen(width, height, frame, logoIdx int, backend string) string {
 	if width < 44 {
 		width = 44
 	}
@@ -102,7 +102,7 @@ func splashScreen(width, height, frame, logoIdx int) string {
 		)
 	}
 	if frame >= 3 {
-		lines = append(lines, center(cDim.Render("ATDT 1-800-CLAUDE . . .")))
+		lines = append(lines, center(cDim.Render(agentDialString(backend))))
 	}
 	if frame >= 4 {
 		lines = append(lines, center(dAdd.Render("CONNECT 57600/ARQ/V.42bis/LAPM")))

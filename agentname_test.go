@@ -27,6 +27,12 @@ func TestAgentLabelsFollowTheBackend(t *testing.T) {
 		if got := agentTagline(c.backend); !strings.Contains(got, c.want) {
 			t.Errorf("tagline for %q = %q, want it to name %q", c.backend, got, c.want)
 		}
+		// The splash dials the agent by name, in caps. It reached this test late:
+		// a sweep for [Cc]laude cannot match CLAUDE, so the one all-caps mention
+		// in the program survived two passes that were looking straight at it.
+		if got := agentDialString(c.backend); !strings.Contains(got, strings.ToUpper(c.want)) {
+			t.Errorf("dial string for %q = %q, want it to name %q", c.backend, got, strings.ToUpper(c.want))
+		}
 	}
 	// The taglines name different plans, so one is not silently reused.
 	if agentTagline(backendClaude) == agentTagline(backendCodex) {
@@ -79,5 +85,17 @@ func TestCodexModelsFrameFillsThePicker(t *testing.T) {
 	items := m.modelItems()
 	if len(items) != 1 || items[0].id != "gpt-x" || items[0].title != "GPT-X" {
 		t.Errorf("picker rows = %+v, want the reported model", items)
+	}
+}
+
+// The splash actually renders the dial line, so the helper cannot drift from
+// what is drawn.
+func TestSplashDialsTheRunningBackend(t *testing.T) {
+	out := stripANSI(splashScreen(90, 0, splashFinalFrame, 0, backendCodex))
+	if !strings.Contains(out, "1-800-CODEX") {
+		t.Errorf("codex splash should dial CODEX, got:\n%s", out)
+	}
+	if strings.Contains(out, "CLAUDE") {
+		t.Errorf("codex splash still names claude:\n%s", out)
 	}
 }
