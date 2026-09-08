@@ -14,8 +14,8 @@ import (
 
 func inputModel(val string) model {
 	m := model{w: 50, h: 20, ready: true}
-	m.input = newPromptArea() // same config as the real app (keymap, prompt, …)
-	m.setPromptWidth(40)      // inner wrap width 38 (prompt "› " is 2 cells)
+	m.input = newPromptArea(backendClaude) // same config as the real app (keymap, prompt, …)
+	m.setPromptWidth(40)                   // inner wrap width 38 (prompt "› " is 2 cells)
 	m.input.SetValue(val)
 	m.input.Focus()
 	return m

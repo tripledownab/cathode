@@ -15,7 +15,7 @@ import (
 // wordmark itself animates per the chosen header style (set via /settings),
 // its color band drifting with phase (incremented by rainbowTickMsg in the
 // update loop).
-func bbsBanner(width, phase int, style string) string {
+func bbsBanner(width, phase int, style, backend string) string {
 	if width < 24 {
 		width = 24
 	}
@@ -23,7 +23,7 @@ func bbsBanner(width, phase int, style string) string {
 		hdrDeco.Render("░▒▓█"),
 		renderHeader(style, studly(appName), phase),
 		hdrDeco.Render("█▓▒░"),
-		hdrSub.Render(ornDeco+" "+flavor("Claude on your Max plan")+" "+ornDeco))
+		hdrSub.Render(ornDeco+" "+flavor(agentTagline(backend))+" "+ornDeco))
 	return hdrBox.Width(width - 2).Render(title)
 }
 

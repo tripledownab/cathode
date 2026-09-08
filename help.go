@@ -16,7 +16,7 @@ import (
 
 // helpModalView is the boxed, centered version of the help text. Rendered by
 // View() through lipgloss.Place so it looks like a floating modal.
-func helpModalView(termW, termH int) string {
+func helpModalView(termW, termH int, backend string) string {
 	w := termW - 8
 	if w < 48 {
 		w = 48
@@ -24,7 +24,7 @@ func helpModalView(termW, termH int) string {
 	if w > 78 {
 		w = 78
 	}
-	body := dTitle.Render(" HELP ") + "\n" + helpText() + "\n" +
+	body := dTitle.Render(" HELP ") + "\n" + helpText(backend) + "\n" +
 		cDim.Render("  [esc / ?] close")
 	box := lipgloss.NewStyle().
 		Border(lipgloss.DoubleBorder()).
@@ -35,13 +35,20 @@ func helpModalView(termW, termH int) string {
 }
 
 // helpText is what /help prints into the transcript.
-func helpText() string {
+func helpText(backend string) string {
 	cmds := slashCommands()
 	sort.SliceStable(cmds, func(a, b int) bool { return cmds[a].name < cmds[b].name })
 	var b strings.Builder
 	b.WriteString("keybindings:\n")
 	b.WriteString("  enter         send  ·  alt+enter / ctrl+j / \\↵  insert a line break\n")
-	b.WriteString("  @             inline file picker — inserts @path (claude expands it to file contents)\n")
+	// Only claude injects the file's contents for an @path; codex receives the
+	// text and has to read the file itself. Verified by probing both. Saying so
+	// matters because the two look identical while typing.
+	if backend == backendCodex {
+		b.WriteString("  @             inline file picker — inserts @path (codex reads the file itself)\n")
+	} else {
+		b.WriteString("  @             inline file picker — inserts @path (claude expands it to file contents)\n")
+	}
 	b.WriteString("  shift+tab     cycle mode (plan → ask → build)\n")
 	b.WriteString("  ctrl+r        resume a session\n")
 	b.WriteString("  ctrl+t        slash command palette\n")
@@ -57,6 +64,6 @@ func helpText() string {
 	for _, c := range cmds {
 		b.WriteString(fmt.Sprintf("  /%-10s %s\n", c.name, c.desc))
 	}
-	b.WriteString("  any other /command is forwarded to claude (custom & plugin commands)\n")
+	b.WriteString("  any other /command is forwarded to " + agentName(backend) + " (custom & plugin commands)\n")
 	return strings.TrimRight(b.String(), "\n")
 }

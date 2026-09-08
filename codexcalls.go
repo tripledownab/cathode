@@ -20,6 +20,7 @@ type codexMsg struct{ frame codexFrame }
 const (
 	codexClosedMethod = "cathode/closed" // the subprocess exited
 	codexErrorMethod  = "cathode/error"  // a call failed, and nobody was waiting
+	codexModelsMethod = "cathode/models" // the model list, fetched not streamed
 )
 
 // codexCallTimeout bounds a request that gets no reply. It is generous because

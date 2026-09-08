@@ -19,7 +19,7 @@ func (m *model) handleEvent(e Envelope) {
 		case "init":
 			m.session, m.modelID = e.Session, e.Model
 			cwd, _ := os.Getwd()
-			m.sessions.Touch(e.Session, e.Model, cwd, "", time.Now())
+			m.sessions.Touch(e.Session, e.Model, cwd, "", m.backend, time.Now())
 			// The server list only arrives here (not in the initialize handshake),
 			// so cache it for the /mcp picker; keep the last non-empty snapshot the
 			// way commands/agents are handled.

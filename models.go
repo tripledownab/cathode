@@ -15,7 +15,7 @@ import (
 // falls back to the three standard aliases.
 func (m *model) modelItems() []pickerItem {
 	if len(m.models) == 0 {
-		return fallbackModelItems()
+		return fallbackModelItems(m.backend)
 	}
 	items := make([]pickerItem, 0, len(m.models))
 	for _, mc := range m.models {
@@ -24,10 +24,20 @@ func (m *model) modelItems() []pickerItem {
 	return items
 }
 
-// fallbackModelItems is the static list used before the initialize handshake
-// replies (or if it never does). Aliases, so they resolve to whatever the
-// subscription's current generation maps to.
-func fallbackModelItems() []pickerItem {
+// fallbackModelItems is the static list used before the live list arrives (or
+// if it never does).
+//
+// Per backend, because a backend's aliases are meaningless to another one:
+// offering "opus" on codex is not a harmless default, it is a row that cannot
+// work. codex has no aliases of its own — its models are named outright by
+// model/list — so it gets a row that says the list has not arrived rather than
+// an invented one.
+func fallbackModelItems(backend string) []pickerItem {
+	if backend == backendCodex {
+		return []pickerItem{
+			{id: "", title: "(model list unavailable)", subtitle: "codex has not reported its models yet"},
+		}
+	}
 	return []pickerItem{
 		{id: "opus", title: "opus", subtitle: "most capable — deep reasoning, big refactors"},
 		{id: "sonnet", title: "sonnet", subtitle: "balanced — the everyday default"},

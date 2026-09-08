@@ -33,6 +33,11 @@ func (m *model) handleCodexEvent(f codexFrame) {
 		m.codexItem(f, false)
 	case "thread/tokenUsage/updated":
 		m.noteCodexTokens(f)
+	case codexModelsMethod:
+		var models []ModelChoice
+		if json.Unmarshal(f.Params, &models) == nil && len(models) > 0 {
+			m.models = models
+		}
 	case "error", codexErrorMethod:
 		var p struct {
 			Message string `json:"message"`

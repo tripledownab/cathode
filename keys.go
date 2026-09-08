@@ -131,7 +131,7 @@ func (m model) handleKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 	switch msg.String() {
 	case "ctrl+r":
 		cwd, _ := os.Getwd()
-		m.picker = newPicker("sessions", "RESUME SESSION", sessionItems(m.sessions, cwd), m.w, m.h)
+		m.picker = newPicker("sessions", "RESUME SESSION", sessionItems(m.sessions, cwd, m.backend), m.w, m.h)
 		return m, nil, true
 	case "ctrl+t":
 		m.picker = newPicker("slash", "COMMANDS", m.paletteItems(), m.w, m.h)
@@ -350,7 +350,7 @@ func (m *model) sendTurn(text string) tea.Cmd {
 	// doesn't overwrite it with a follow-up correction.
 	if !steering && m.session != "" {
 		cwd, _ := os.Getwd()
-		m.sessions.Touch(m.session, m.modelID, cwd, truncFirst(text), time.Now())
+		m.sessions.Touch(m.session, m.modelID, cwd, truncFirst(text), m.backend, time.Now())
 	}
 	m.busy = true
 	return m.armSpinnerIfNeeded()
