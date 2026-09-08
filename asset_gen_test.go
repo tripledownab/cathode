@@ -80,7 +80,7 @@ func TestGenerateThemeAssets(t *testing.T) {
 // genSplashScreen renders the boot screen at its final reveal frame. height 0
 // returns the bare content (no vertical centering), so the image is compact.
 func genSplashScreen() string {
-	return splashScreen(90, 0, splashFinalFrame, 0)
+	return splashScreen(90, 0, splashFinalFrame, 0, backendClaude)
 }
 
 // previewModel builds a real model mid-turn — a user request, a plain reply,

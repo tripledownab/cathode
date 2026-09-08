@@ -17,7 +17,7 @@ func (m model) View() string {
 		return "starting…"
 	}
 	if m.splash {
-		return splashScreen(m.w, m.h, m.splashFrame, m.logoIdx)
+		return splashScreen(m.w, m.h, m.splashFrame, m.logoIdx, m.backend)
 	}
 	bg := m.renderBackground()
 	// Modal overlays float on top of the live transcript via placeOverlay

@@ -3,6 +3,8 @@
 
 package main
 
+import "strings"
+
 // ---- what the running backend is called on screen ----
 //
 // Every user-visible mention of the agent goes through here. Before this, the
@@ -32,6 +34,14 @@ func agentTagline(backend string) string {
 		return "codex on your ChatGPT plan"
 	}
 	return "claude on your Max plan"
+}
+
+// agentDialString is the splash screen's dial-up line. Pure BBS flavour — ATDT
+// was the Hayes modem command to dial — but it names the agent, so it belongs
+// with the rest of the copy that does. Upper case because a 1980s board would
+// have printed it that way, and because the number is a joke about the name.
+func agentDialString(backend string) string {
+	return "ATDT 1-800-" + strings.ToUpper(agentName(backend)) + " . . ."
 }
 
 // promptPlaceholder is the empty-input hint.
