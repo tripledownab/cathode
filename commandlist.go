@@ -58,6 +58,17 @@ func slashCommands() []slashCmd {
 			},
 		},
 		{
+			name: "backend",
+			desc: "switch the agent CLI without restarting (claude|codex)",
+			exec: func(m *model, arg string) (model, tea.Cmd) {
+				if id := strings.TrimSpace(strings.ToLower(arg)); id != "" {
+					return *m, m.commitBackend(id)
+				}
+				m.picker = newPicker("backend", "BACKEND", backendItems(m.backend), m.w, m.h)
+				return *m, nil
+			},
+		},
+		{
 			name: "mcp",
 			desc: "manage MCP servers — status, reconnect/enable/disable",
 			// The server list comes from claude's system/init line, and the

@@ -15,20 +15,23 @@ import (
 // there was no way to assert what actually reached the wire, only what the
 // helpers returned in isolation.
 type fakeEngine struct {
-	sent []string
+	sent     []string
+	shutdown bool
 }
 
 func (f *fakeEngine) Send(text string) error { f.sent = append(f.sent, text); return nil }
 
-// The rest of the seam, unrecorded: no test reads them yet, and a field nobody
-// asserts is a field that can drift from what it claims to capture. Record one
-// when a test needs it.
+// Close is recorded because a declined backend switch must leave the old engine
+// running, and that is only checkable by asking whether it was shut down
+// (backendswitch_test.go). The rest stay unrecorded: a field nobody asserts is
+// a field that can drift from what it claims to capture. Record one when a test
+// needs it.
+func (f *fakeEngine) Close()                              { f.shutdown = true }
 func (f *fakeEngine) Initialize() error                   { return nil }
 func (f *fakeEngine) Interrupt() error                    { return nil }
 func (f *fakeEngine) SetPermissionMode(mode string) error { return nil }
 func (f *fakeEngine) SetModel(m string) error             { return nil }
 func (f *fakeEngine) Pipe(*tea.Program)                   {}
-func (f *fakeEngine) Close()                              {}
 
 var _ Engine = (*fakeEngine)(nil)
 
