@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 // A live check against the real `codex` CLI, off by default because it spends a
@@ -32,9 +34,7 @@ func TestCodexLiveRoundTrip(t *testing.T) {
 	defer e.Close()
 
 	frames := make(chan codexFrame, 256)
-	e.mu.Lock()
-	e.sink = func(f codexFrame) { frames <- f }
-	e.mu.Unlock()
+	sinkTo(e, frames, nil)
 
 	if err := e.Initialize(); err != nil {
 		t.Fatalf("Initialize: %v", err)
@@ -76,39 +76,38 @@ func TestCodexLiveRoundTrip(t *testing.T) {
 	}
 }
 
-// What each mode actually does with a gated action, against the real CLI.
+// What each mode does with a gated action, against the real CLI.
 //
 // The property that matters is that the turn always ENDS. codex blocks until a
 // server request is answered, so the failure guarded against is not a wrong
 // answer, it is no answer — which presents as a frozen UI with nothing in the
 // log.
 //
-// The two rows also pin the current limit of this backend. In build mode codex
-// asks for nothing and the action runs, so the backend is usable today. In ask
-// mode every gated action is refused, because the approval pane is not wired to
-// codex yet and granting silently would defeat the mode.
+// build asks for nothing and the action runs. ask raises a real approval, which
+// this answers the way the pane would.
 func TestCodexLiveGatedActionsAlwaysEndTheTurn(t *testing.T) {
 	if os.Getenv("CATHODE_CODEX_LIVE") == "" {
 		t.Skip("set CATHODE_CODEX_LIVE=1 to run against the real codex CLI")
 	}
 	for _, c := range []struct {
-		mode        string
-		wantRefusal bool
+		mode       string
+		wantPrompt bool
+		allow      bool
 	}{
-		{"build", false},
-		{"ask", true},
+		{"build", false, false},
+		{"ask", true, true},
 	} {
 		t.Run(c.mode, func(t *testing.T) {
-			e, err := newCodexEngine(codexEngineConfig{Mode: c.mode, Cwd: t.TempDir()})
+			dir := t.TempDir()
+			e, err := newCodexEngine(codexEngineConfig{Mode: c.mode, Cwd: dir})
 			if err != nil {
 				t.Fatalf("spawn: %v", err)
 			}
 			defer e.Close()
 
 			frames := make(chan codexFrame, 256)
-			e.mu.Lock()
-			e.sink = func(f codexFrame) { frames <- f }
-			e.mu.Unlock()
+			other := make(chan tea.Msg, 16)
+			sinkTo(e, frames, other)
 
 			if err := e.Initialize(); err != nil {
 				t.Fatalf("Initialize: %v", err)
@@ -117,21 +116,31 @@ func TestCodexLiveGatedActionsAlwaysEndTheTurn(t *testing.T) {
 				t.Fatalf("Send: %v", err)
 			}
 
-			var refused bool
+			var asked bool
 			deadline := time.After(3 * time.Minute)
 			for {
 				select {
+				case msg := <-other:
+					pa, ok := msg.(pendingApprovalMsg)
+					if !ok {
+						continue
+					}
+					asked = true
+					t.Logf("approval asked: %s", pa.req.toolName)
+					pa.req.reply <- approvalReply{allow: c.allow}
 				case f := <-frames:
-					if f.Method == codexErrorMethod {
-						t.Logf("notice: %s", f.Params)
-						refused = true
+					if f.Method != "turn/completed" && f.Method != "turn/failed" {
+						continue
 					}
-					if f.Method == "turn/completed" || f.Method == "turn/failed" {
-						if refused != c.wantRefusal {
-							t.Errorf("%s mode: refused=%v, want %v", c.mode, refused, c.wantRefusal)
+					if asked != c.wantPrompt {
+						t.Errorf("%s mode: asked=%v, want %v", c.mode, asked, c.wantPrompt)
+					}
+					if c.allow {
+						if _, err := os.Stat(filepath.Join(dir, "probe.txt")); err != nil {
+							t.Errorf("approved, but the file was not written: %v", err)
 						}
-						return
 					}
+					return
 				case <-deadline:
 					t.Fatal("the turn never ended — a server request went unanswered")
 				}
@@ -162,9 +171,7 @@ func TestCodexLiveEditRendersAsADiffCard(t *testing.T) {
 	defer e.Close()
 
 	frames := make(chan codexFrame, 256)
-	e.mu.Lock()
-	e.sink = func(f codexFrame) { frames <- f }
-	e.mu.Unlock()
+	sinkTo(e, frames, nil)
 
 	if err := e.Initialize(); err != nil {
 		t.Fatalf("Initialize: %v", err)
@@ -214,9 +221,7 @@ func TestCodexLiveModelListReachesThePicker(t *testing.T) {
 	defer e.Close()
 
 	frames := make(chan codexFrame, 64)
-	e.mu.Lock()
-	e.sink = func(f codexFrame) { frames <- f }
-	e.mu.Unlock()
+	sinkTo(e, frames, nil)
 
 	if err := e.Initialize(); err != nil {
 		t.Fatalf("Initialize: %v", err)

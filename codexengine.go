@@ -35,6 +35,15 @@ type codexEngine struct {
 	wmu     sync.Mutex // serialises writes to stdin
 	pending *codexPending
 
+	// approvalSlot admits one approval to the pane at a time.
+	//
+	// The UI holds exactly one pending approval (update.go assigns m.pending),
+	// so a second arriving before the first is answered would overwrite it and
+	// the first request would never be replied to — and codex waits on a reply
+	// forever. claude cannot hit this: its approvals are pulled one at a time by
+	// waitApproval. codex pushes, so the serialising has to happen here.
+	approvalSlot chan struct{}
+
 	mu       sync.Mutex // guards everything below
 	cwd      string     // working root the thread runs in
 	resumeID string     // thread to resume on Initialize, or ""
@@ -42,12 +51,13 @@ type codexEngine struct {
 	turnID   string // live turn, learned from turn/started; interrupt needs it
 	mode     string // cathode mode, applied at the next turn/start
 	model    string
-	// sink is where a non-reply frame goes. Pipe sets it; until then frames
-	// are held in backlog. A function rather than the *tea.Program itself
-	// keeps the emit path independent of Bubble Tea, which is what lets a test
-	// collect frames directly.
-	sink    func(codexFrame)
-	backlog []codexFrame // frames that arrived before Pipe registered a sink
+	// sink is where anything bound for the UI goes. Pipe sets it; until then
+	// messages are held in backlog. It takes a tea.Msg rather than a codexFrame
+	// because an approval request carries a reply channel, which cannot be
+	// expressed as JSON — and reusing pendingApprovalMsg is what lets codex
+	// share the whole approval pane rather than growing a second one.
+	sink    func(tea.Msg)
+	backlog []tea.Msg // messages that arrived before Pipe registered a sink
 }
 
 // codexEngineConfig is what main resolved for a codex session.
@@ -90,11 +100,12 @@ func newCodexEngine(cfg codexEngineConfig) (*codexEngine, error) {
 	}
 	e := &codexEngine{
 		cmd: cmd, stdin: stdin, stdout: stdout,
-		pending:  newCodexPending(),
-		mode:     cfg.Mode,
-		model:    cfg.Model,
-		cwd:      cfg.Cwd,
-		resumeID: cfg.ResumeID,
+		pending:      newCodexPending(),
+		approvalSlot: make(chan struct{}, 1),
+		mode:         cfg.Mode,
+		model:        cfg.Model,
+		cwd:          cfg.Cwd,
+		resumeID:     cfg.ResumeID,
 	}
 	go e.read()
 	return e, nil
@@ -103,14 +114,13 @@ func newCodexEngine(cfg codexEngineConfig) (*codexEngine, error) {
 // Pipe registers the program and flushes anything the handshake produced.
 // Unlike claudeEngine.Pipe this does not block: reading started at construction.
 func (e *codexEngine) Pipe(p *tea.Program) {
-	send := func(f codexFrame) { p.Send(codexMsg{frame: f}) }
 	e.mu.Lock()
-	e.sink = send
+	e.sink = p.Send
 	held := e.backlog
 	e.backlog = nil
 	e.mu.Unlock()
-	for _, f := range held {
-		send(f)
+	for _, msg := range held {
+		p.Send(msg)
 	}
 }
 

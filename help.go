@@ -62,6 +62,9 @@ func helpText(backend string) string {
 	b.WriteString("  ctrl+c        clear the prompt · interrupt the turn · again to quit\n")
 	b.WriteString("commands:\n")
 	for _, c := range cmds {
+		if !c.availableOn(backend) {
+			continue
+		}
 		b.WriteString(fmt.Sprintf("  /%-10s %s\n", c.name, c.desc))
 	}
 	b.WriteString("  any other /command is forwarded to " + agentName(backend) + " (custom & plugin commands)\n")

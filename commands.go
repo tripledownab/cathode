@@ -17,7 +17,29 @@ import (
 type slashCmd struct {
 	name string
 	desc string
+	// only lists the backends this command works on. Empty means every one.
+	//
+	// A command that depends on something one backend has — claude's output
+	// styles, its MCP server list — is not merely useless elsewhere: offered
+	// and selected, it either does nothing or gets forwarded to the agent as a
+	// prompt, which is worse than not being there. Declaring it here keeps the
+	// palette, the help text and the dispatcher agreeing, because all three ask
+	// this one question.
+	only []string
 	exec func(m *model, arg string) (model, tea.Cmd)
+}
+
+// availableOn reports whether this command works on the given backend.
+func (c slashCmd) availableOn(backend string) bool {
+	if len(c.only) == 0 {
+		return true
+	}
+	for _, b := range c.only {
+		if b == sessionBackend(backend) {
+			return true
+		}
+	}
+	return false
 }
 
 // runSlash dispatches "/name [arg]" against our in-process command table.
@@ -34,19 +56,31 @@ func runSlash(m *model, line string) (model, tea.Cmd, bool) {
 	name, arg, _ := strings.Cut(rest, " ")
 	name = strings.ToLower(name)
 	for _, c := range slashCommands() {
-		if c.name == name {
-			nm, cmd := c.exec(m, arg)
-			return nm, cmd, true
+		if c.name != name {
+			continue
 		}
+		if !c.availableOn(m.backend) {
+			// Handled, not forwarded. Falling through would send "/sysprompt"
+			// to the agent as a prompt, which reads as the command silently
+			// doing something odd rather than not existing here.
+			m.add(entInfo, "/"+c.name+" is not available on the "+agentName(m.backend)+" backend")
+			return *m, nil, true
+		}
+		nm, cmd := c.exec(m, arg)
+		return nm, cmd, true
 	}
 	return *m, nil, false
 }
 
-// slashItems projects the slash command table into picker rows.
-func slashItems() []pickerItem {
+// slashItems projects the slash command table into picker rows, omitting the
+// commands this backend cannot run.
+func slashItems(backend string) []pickerItem {
 	cmds := slashCommands()
 	items := make([]pickerItem, 0, len(cmds))
 	for _, c := range cmds {
+		if !c.availableOn(backend) {
+			continue
+		}
 		items = append(items, pickerItem{id: c.name, title: "/" + c.name, subtitle: c.desc})
 	}
 	sort.SliceStable(items, func(a, b int) bool { return items[a].title < items[b].title })
@@ -58,7 +92,7 @@ func slashItems() []pickerItem {
 // plugin commands), deduped by name with ours winning — ours run locally, the
 // rest are forwarded to claude on select.
 func (m *model) paletteItems() []pickerItem {
-	items := slashItems()
+	items := slashItems(m.backend)
 	seen := make(map[string]bool, len(items))
 	for _, it := range items {
 		seen[it.id] = true

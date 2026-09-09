@@ -351,5 +351,12 @@ type pendingApprovalMsg struct{ req approvalReq }
 // waitApproval blocks on the next permission request. Re-issued after each
 // decision so the next one is picked up.
 func waitApproval(a *Approvals) tea.Cmd {
+	// nil on codex, which raises approvals as requests on its own connection
+	// rather than through a queue this can block on. Returning nil keeps the
+	// shared approval keys (keys.go) working on both backends: they re-arm the
+	// waiter after every decision, and on codex there is nothing to re-arm.
+	if a == nil {
+		return nil
+	}
 	return func() tea.Msg { return pendingApprovalMsg{req: <-a.pending} }
 }
