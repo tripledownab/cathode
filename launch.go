@@ -24,4 +24,10 @@ type launchConfig struct {
 	Spinner   string     // throbber style id
 	ResumeID  string     // session to replay into the transcript, or ""
 	SysPrompt string     // standing instructions in force, or ""
+
+	// EngineCfg is the claude launch config, kept so /backend can re-spawn a
+	// backend without a re-exec (backendswitch.go). Prog is the running program,
+	// filled by main once it exists (progref.go).
+	EngineCfg EngineConfig
+	Prog      *progRef
 }

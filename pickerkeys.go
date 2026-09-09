@@ -77,6 +77,13 @@ func (m model) handlePickerKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 			m.commitBar(chosen)
 		}
 		return m, nil, true
+	case "backend":
+		// Swaps the subprocess in place — no re-exec, so the transcript stays
+		// (backendswitch.go).
+		if chosen != "" {
+			return m, m.commitBackend(chosen), true
+		}
+		return m, nil, true
 	case "sysprompt":
 		// May return tea.Quit: applying it restarts into a resumed session
 		// (sysprompt.go).
@@ -158,6 +165,13 @@ func (m model) handlePickerKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 			p := newPicker("bar", "COMPACT BAR", barItems(), m.w, m.h)
 			p.setCursorTo(m.settings.Bar)
 			m.picker = p
+		case "backend":
+			// Swaps the subprocess in place — no re-exec, so the transcript stays
+			// (backendswitch.go).
+			if chosen != "" {
+				return m, m.commitBackend(chosen), true
+			}
+			return m, nil, true
 		case "sysprompt":
 			p := newPicker("sysprompt", "EXTRA SYSTEM PROMPT", sysPromptItems(m.sysPromptEdited()), m.w, m.h)
 			p.setCursorTo(sysPromptLabel(m.settings.SysPrompt))

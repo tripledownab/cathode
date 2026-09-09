@@ -60,7 +60,9 @@ type bodyKey struct {
 // external services up top, modal flags, widgets, then session/turn state.
 type model struct {
 	engine    Engine
-	backend   string // which agent CLI is being driven; see agentname.go
+	backend   string       // which agent CLI is being driven; see agentname.go
+	engineCfg EngineConfig // the launch config, reused when /backend re-spawns
+	prog      *progRef     // the running program, for piping a swapped engine
 	approvals *Approvals
 	md        *glamour.TermRenderer
 	hist      *history
@@ -178,9 +180,12 @@ type model struct {
 	// is cumulative. ctxLimit defaults to 200K and auto-grows when observed
 	// ctx exceeds it, so users on the 1M-context beta don't see a stuck ⚠.
 	ctxTokens int
-	outTokens int
-	ctxLimit  int
-	resumeID  string // set via restartResuming (session picker, /sysprompt); main.go re-execs on it after p.Run()
+	// baseCtxLimit is the -ctx floor. A backend switch returns ctxLimit to it,
+	// because the window it grew to described a model that is gone.
+	baseCtxLimit int
+	outTokens    int
+	ctxLimit     int
+	resumeID     string // set via restartResuming (session picker, /sysprompt); main.go re-execs on it after p.Run()
 	// sysPromptSeen is the standing-instruction text as claude got it at launch,
 	// and "" whenever no style reached claude: the toggle off, an empty prompt
 	// file, or a style file that could not be written. The flag reads the file
@@ -235,6 +240,7 @@ func newModel(cfg launchConfig) model {
 	applyTheme(st.Theme) // re-skin all styles to the persisted theme before first paint
 	m := model{
 		engine: cfg.Engine, backend: cfg.Backend, approvals: cfg.Approvals,
+		engineCfg: cfg.EngineCfg, prog: cfg.Prog,
 		hist:     openHistory(),
 		sessions: openSessionStore(),
 		input:    ta, sp: sp,

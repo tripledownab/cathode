@@ -131,9 +131,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	prog := &progRef{}
 	m := newModel(launchConfig{
 		Engine:    engine,
 		Backend:   *backend,
+		EngineCfg: cfg,
+		Prog:      prog,
 		Approvals: approvals,
 		Mode:      *mode,
 		Spinner:   *spin,
@@ -141,10 +144,15 @@ func main() {
 		SysPrompt: sysPrompt,
 	})
 	m.ctxLimit = parseTokenCount(*ctx)
+	m.baseCtxLimit = m.ctxLimit
 	// A resumed session may already exceed the base limit; grow it now that the
 	// -ctx flag has set the floor, so the gauge starts honest (see observeCtx).
 	m.observeCtx(m.ctxTokens)
 	p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion())
+	// Set before the program runs, so /backend can pipe a swapped engine into
+	// it later (progref.go). The model was copied into p above, but it holds a
+	// pointer to this holder, so the copy sees the value too.
+	prog.set(p)
 
 	go engine.Pipe(p)
 

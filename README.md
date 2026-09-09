@@ -103,6 +103,11 @@ would divert billing to one.
 
 Codex needs `codex login` completed, the same way claude needs `claude login`.
 
+`/backend` switches between them **inside a running session**, with no restart.
+The transcript stays on screen; the conversation does not carry over, because a
+session id from one backend means nothing to the other. The switch says so
+rather than leaving you to notice.
+
 The codex backend is newer and narrower than the claude one:
 
 - All four modes work. `build` and `bypass` run tools without asking; `ask` and

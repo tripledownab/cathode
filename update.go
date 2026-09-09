@@ -117,9 +117,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case streamMsg:
+		// Ignore a backend that is no longer ours. After /backend swaps engines
+		// the old subprocess is still draining into this same program, so its
+		// last frames — and the EOF that follows — would land in the new
+		// session's transcript and announce that it had ended (backendswitch.go).
+		if sessionBackend(m.backend) != backendClaude {
+			return m, nil
+		}
 		m.handleEvent(msg.env)
 
 	case codexMsg:
+		if sessionBackend(m.backend) != backendCodex {
+			return m, nil
+		}
 		m.handleCodexEvent(msg.frame)
 
 	case engineInitErrMsg:
@@ -156,6 +166,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.pending = &msg.req
 
 	case streamClosedMsg:
+		// Same rule: the closing engine may be the one we just switched away
+		// from, and its EOF is expected rather than the end of this session.
+		if sessionBackend(m.backend) != backendClaude {
+			return m, nil
+		}
 		m.busy = false
 		m.stopCompacting()
 		note := "session ended"
