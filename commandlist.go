@@ -60,6 +60,9 @@ func slashCommands() []slashCmd {
 		{
 			name: "mcp",
 			desc: "manage MCP servers — status, reconnect/enable/disable",
+			// The server list comes from claude's system/init line, and the
+			// subcommands are forwarded to claude's own /mcp.
+			only: []string{backendClaude},
 			exec: func(m *model, arg string) (model, tea.Cmd) {
 				return m.mcpCommand(arg)
 			},
@@ -121,6 +124,10 @@ func slashCommands() []slashCmd {
 		{
 			name: "sysprompt",
 			desc: "toggle your standing instructions as claude's response style (on|off)",
+			// Delivered as a claude output style (outputstyle.go). codex has no
+			// equivalent, so the toggle would restart the session and change
+			// nothing.
+			only: []string{backendClaude},
 			exec: func(m *model, arg string) (model, tea.Cmd) {
 				switch id := strings.TrimSpace(strings.ToLower(arg)); id {
 				case sysPromptOn, sysPromptOff:

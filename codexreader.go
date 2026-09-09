@@ -7,6 +7,8 @@ import (
 	"bufio"
 	"encoding/json"
 	"strings"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 // The stdout side of the codex connection: one goroutine consuming frames and
@@ -72,14 +74,19 @@ func (e *codexEngine) noteTurn(f codexFrame) {
 // emit forwards one frame to the sink, or holds it until one is registered.
 // The send happens outside the lock: a slow consumer must not block the reader,
 // which would stall every later frame behind it.
-func (e *codexEngine) emit(f codexFrame) {
+func (e *codexEngine) emit(f codexFrame) { e.emitMsg(codexMsg{frame: f}) }
+
+// emitMsg forwards any message to the sink, or holds it until one is
+// registered. The send happens outside the lock: a slow consumer must not block
+// the reader, which would stall every later message behind it.
+func (e *codexEngine) emitMsg(msg tea.Msg) {
 	e.mu.Lock()
 	sink := e.sink
 	if sink == nil {
-		e.backlog = append(e.backlog, f)
+		e.backlog = append(e.backlog, msg)
 		e.mu.Unlock()
 		return
 	}
 	e.mu.Unlock()
-	sink(f)
+	sink(msg)
 }

@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 // fakeAppServer writes a stand-in for `codex app-server` and points
@@ -51,6 +53,23 @@ while IFS= read -r line; do
   esac
 done
 `
+
+// sinkTo points the engine's UI channel at test channels. Frames and other
+// messages are separated because an approval request carries a reply channel
+// and so cannot be a frame. Pass nil for other to ignore them.
+func sinkTo(e *codexEngine, frames chan codexFrame, other chan tea.Msg) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.sink = func(msg tea.Msg) {
+		if cm, ok := msg.(codexMsg); ok {
+			frames <- cm.frame
+			return
+		}
+		if other != nil {
+			other <- msg
+		}
+	}
+}
 
 func TestCodexInitializeOpensAThread(t *testing.T) {
 	fakeAppServer(t, echoServer)
@@ -279,5 +298,149 @@ func TestCodexUpdateRendersAsADiffCard(t *testing.T) {
 	out := stripANSI(renderDiffFor(diffUnified, last.diffs[0], 80))
 	if !strings.Contains(out, "+ b") || !strings.Contains(out, "- a") {
 		t.Errorf("the card should show the change, got:\n%s", out)
+	}
+}
+
+// A gated action reaches the shared approval pane, and the user's answer
+// becomes the JSON-RPC decision codex is waiting for.
+//
+// The reply must go out on its own goroutine. The reader has to keep draining
+// while the pane is up, or the item events that draw the very card being
+// approved never arrive — a deadlock that looks like a frozen approval bar.
+func TestCodexApprovalRoundTrip(t *testing.T) {
+	for _, c := range []struct {
+		name  string
+		allow bool
+		want  string
+	}{
+		{"allow", true, codexApproval},
+		{"deny", false, codexRefusal},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			// A stand-in that raises one approval, then echoes whatever we send
+			// back so the test can read the decision off the wire.
+			fakeAppServer(t, `
+while IFS= read -r line; do
+  case "$line" in
+    *'"initialize"'*) printf '{"method":"item/commandExecution/requestApproval","id":0,"params":{"itemId":"exec-1","command":"rm -rf /tmp/x"}}\n' ;;
+    *'"decision"'*)   printf '{"method":"cathode/test/echo","params":%s}\n' "$line" ;;
+  esac
+done
+`)
+			e, err := newCodexEngine(codexEngineConfig{Mode: "ask"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer e.Close()
+
+			frames := make(chan codexFrame, 16)
+			other := make(chan tea.Msg, 16)
+			sinkTo(e, frames, other)
+
+			go func() { _, _ = e.call("initialize", map[string]any{}) }()
+
+			var req approvalReq
+			select {
+			case msg := <-other:
+				pa, ok := msg.(pendingApprovalMsg)
+				if !ok {
+					t.Fatalf("got %T, want the shared pendingApprovalMsg", msg)
+				}
+				req = pa.req
+			case <-time.After(5 * time.Second):
+				t.Fatal("the approval never reached the UI")
+			}
+
+			if req.toolName != "rm -rf /tmp/x" {
+				t.Errorf("bar label = %q, want the command itself", req.toolName)
+			}
+			if req.toolUseID != "exec-1" {
+				t.Errorf("toolUseID = %q, want the itemId that pairs it with the card", req.toolUseID)
+			}
+
+			req.reply <- approvalReply{allow: c.allow}
+
+			select {
+			case f := <-frames:
+				if !strings.Contains(string(f.Params), `"decision":"`+c.want+`"`) {
+					t.Errorf("sent %s, want decision %q", f.Params, c.want)
+				}
+			case <-time.After(5 * time.Second):
+				t.Fatalf("no decision was sent; codex would wait forever")
+			}
+		})
+	}
+}
+
+// Two gated actions in flight must both be answered.
+//
+// The UI holds one pending approval, so an eager second push would overwrite
+// the first and its request would never be replied to — and codex waits on a
+// reply forever. claude cannot hit this because its approvals are pulled one at
+// a time; codex pushes, so the engine serialises them.
+func TestCodexApprovalsAreAnsweredOneAtATime(t *testing.T) {
+	fakeAppServer(t, `
+while IFS= read -r line; do
+  case "$line" in
+    *'"initialize"'*)
+      printf '{"method":"item/commandExecution/requestApproval","id":0,"params":{"itemId":"a","command":"first"}}\n'
+      printf '{"method":"item/commandExecution/requestApproval","id":1,"params":{"itemId":"b","command":"second"}}\n' ;;
+    *'"decision"'*) printf '{"method":"cathode/test/echo","params":%s}\n' "$line" ;;
+  esac
+done
+`)
+	e, err := newCodexEngine(codexEngineConfig{Mode: "ask"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer e.Close()
+
+	frames := make(chan codexFrame, 16)
+	other := make(chan tea.Msg, 16)
+	sinkTo(e, frames, other)
+	go func() { _, _ = e.call("initialize", map[string]any{}) }()
+
+	// Only one may be offered before it is answered.
+	first := awaitApproval(t, other)
+	select {
+	case msg := <-other:
+		if _, ok := msg.(pendingApprovalMsg); ok {
+			t.Fatal("a second approval was offered while the first was unanswered")
+		}
+	case <-time.After(300 * time.Millisecond):
+	}
+
+	first.reply <- approvalReply{allow: true}
+	second := awaitApproval(t, other)
+	second.reply <- approvalReply{allow: false}
+
+	// Both decisions must reach the wire, or one turn hangs.
+	seen := map[string]bool{}
+	deadline := time.After(5 * time.Second)
+	for len(seen) < 2 {
+		select {
+		case f := <-frames:
+			for _, d := range []string{codexApproval, codexRefusal} {
+				if strings.Contains(string(f.Params), `"decision":"`+d+`"`) {
+					seen[d] = true
+				}
+			}
+		case <-deadline:
+			t.Fatalf("only %d of 2 decisions were sent: %v", len(seen), seen)
+		}
+	}
+}
+
+func awaitApproval(t *testing.T, ch chan tea.Msg) approvalReq {
+	t.Helper()
+	for {
+		select {
+		case msg := <-ch:
+			if pa, ok := msg.(pendingApprovalMsg); ok {
+				return pa.req
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatal("no approval reached the UI")
+		}
 	}
 }

@@ -105,14 +105,14 @@ Codex needs `codex login` completed, the same way claude needs `claude login`.
 
 The codex backend is newer and narrower than the claude one:
 
-- `build` and `bypass` work fully. Tools run, and codex asks for nothing.
-- `ask` and `plan` refuse gated actions rather than granting them, because the
-  approval pane is not wired to codex yet.
+- All four modes work. `build` and `bypass` run tools without asking; `ask` and
+  `plan` raise the same approval pane claude uses, and your answer becomes the
+  decision codex is waiting on.
 - File changes render as real diff cards, in both the unified and side-by-side
   styles. Other tool calls render as plain cards rather than the typed ones
   claude gets.
-- Session replay, `/compact`, `/sysprompt` and the slash-command palette are
-  claude-only so far.
+- `/sysprompt` and `/mcp` are claude-only and are hidden on codex rather than
+  offered and inert. Session replay and `/compact` are claude-only too.
 - `@path` inserts a path but does not inject the file. Only claude expands an
   `@` mention into file contents; codex reads the file itself with a tool.
 
