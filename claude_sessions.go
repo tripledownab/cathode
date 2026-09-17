@@ -124,11 +124,19 @@ func sessionItems(s *sessionStore, cwd, backend string) []pickerItem {
 		if sessionBackend(e.Backend) != sessionBackend(backend) {
 			continue
 		}
-		title := short(e.ID)
-		if e.First != "" {
-			title = short(e.ID) + "  " + e.First
+		// The label the row is read for, in order of usefulness: a name the user
+		// gave it, else the first thing they asked, else the id. The id moves to
+		// the second row either way — it identifies the session but nobody scans
+		// a list by it, and on a narrow terminal it was crowding out the part
+		// that is actually readable.
+		title := e.Title
+		if title == "" {
+			title = e.First
 		}
-		parts := []string{filepath.Base(e.Cwd)}
+		if title == "" {
+			title = short(e.ID)
+		}
+		parts := []string{short(e.ID), filepath.Base(e.Cwd)}
 		if e.Model != "" {
 			parts = append(parts, e.Model)
 		}

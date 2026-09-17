@@ -22,6 +22,11 @@ type sessionInfo struct {
 	Cwd      string    `json:"cwd"`
 	LastUsed time.Time `json:"last_used"`
 	First    string    `json:"first,omitempty"` // truncated first user prompt, if known
+	// Title is a name the user gave this session (/title). It replaces First in
+	// the picker, because a first prompt is often a poor label for what the
+	// session turned into — and on a narrow terminal it is the row's only
+	// readable part.
+	Title string `json:"title,omitempty"`
 	// Backend is which agent CLI owns this id. Empty means claude: every record
 	// written before cathode had a second backend is one of its sessions, so the
 	// zero value is the right default and no migration is needed.
@@ -80,6 +85,25 @@ func (s *sessionStore) load() {
 // Touch upserts a session. Empty model/cwd/first don't overwrite existing
 // values (so a follow-up Touch carrying only LastUsed preserves prior
 // metadata). LastUsed is always bumped.
+// SetTitle names a session. An empty title clears it, so the picker falls back
+// to the first prompt — there is no separate "unset" verb to remember.
+func (s *sessionStore) SetTitle(id, title string) {
+	if id == "" {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	cur, ok := s.entries[id]
+	if !ok {
+		// Titling a session the store has never seen would create a row with no
+		// cwd, model or timestamp, which then sorts and renders as a ghost.
+		return
+	}
+	cur.Title = title
+	s.entries[id] = cur
+	s.rewrite() // called with the lock held, the same as Touch
+}
+
 func (s *sessionStore) Touch(id, model, cwd, first, backend string, now time.Time) {
 	if id == "" {
 		return
