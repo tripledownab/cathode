@@ -137,3 +137,39 @@ func TestSessionRowDoesNotPrintTheIdTwice(t *testing.T) {
 		t.Errorf("subtitle %q lost the rest of the detail", it.subtitle)
 	}
 }
+
+// A title has to survive the merge with claude's own session files.
+//
+// Every claude session has a JSONL on disk, so the filesystem entry always wins
+// the merge. Copying named fields out of the store into it drops everything
+// nobody remembered to list — which silently made /title a no-op on the backend
+// most sessions run on, while still printing a confirmation.
+func TestMergeKeepsStoreOnlyFieldsWhenTheFilesystemWins(t *testing.T) {
+	s := newTestStore(t)
+	const cwd = "/work/repo"
+	old := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
+	s.Touch("sess-1", "sonnet", cwd, "the first thing I asked", backendClaude, old)
+	s.SetTitle("sess-1", "rewriting the parser")
+
+	// What listClaudeSessions produces: id, cwd, mtime, and what it could parse.
+	fresh := time.Date(2026, 6, 20, 0, 0, 0, 0, time.UTC)
+	fs := []sessionInfo{{ID: "sess-1", Cwd: cwd, LastUsed: fresh, First: "the first thing I asked"}}
+
+	merged := mergeWithStore(fs, s, cwd)
+	if len(merged) != 1 {
+		t.Fatalf("want one merged row, got %d", len(merged))
+	}
+	got := merged[0]
+	if got.Title != "rewriting the parser" {
+		t.Errorf("Title = %q — a store-only field was dropped by the merge", got.Title)
+	}
+	if got.Backend != backendClaude {
+		t.Errorf("Backend = %q, want it carried from the store", got.Backend)
+	}
+	if !got.LastUsed.Equal(fresh) {
+		t.Errorf("LastUsed = %v, want the filesystem mtime to still win", got.LastUsed)
+	}
+	if got.Model != "sonnet" {
+		t.Errorf("Model = %q, want the cached one when the file did not name it", got.Model)
+	}
+}
