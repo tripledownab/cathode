@@ -80,9 +80,9 @@ func TestTrimTitleNormalisesWhatWasTyped(t *testing.T) {
 	}
 	// Runes, not bytes: a title is prose, and a byte slice cuts a multi-byte
 	// rune in half and emits invalid UTF-8.
-	long := trimTitle(strings.Repeat("é", 200))
-	if n := len([]rune(long)); n != titleMaxRunes {
-		t.Errorf("capped to %d runes, want %d", n, titleMaxRunes)
+	long := trimTitle(strings.Repeat("é", sessionLabelMax*2))
+	if n := len([]rune(long)); n != sessionLabelMax {
+		t.Errorf("capped to %d runes, want %d", n, sessionLabelMax)
 	}
 	if !utf8.ValidString(long) {
 		t.Errorf("capped title is not valid UTF-8: %q", long)
@@ -94,12 +94,22 @@ func TestTrimTitleNormalisesWhatWasTyped(t *testing.T) {
 
 // The same rule for the first prompt, which used to be sliced by byte offset.
 func TestTruncFirstIsRuneSafe(t *testing.T) {
-	got := truncFirst(strings.Repeat("é", 200))
+	got := truncFirst(strings.Repeat("é", sessionLabelMax*2))
 	if !utf8.ValidString(got) {
 		t.Errorf("truncated prompt is not valid UTF-8: %q", got)
 	}
-	if n := len([]rune(got)); n != 64 {
-		t.Errorf("capped to %d runes, want 64", n)
+	if n := len([]rune(got)); n != sessionLabelMax {
+		t.Errorf("capped to %d runes, want %d", n, sessionLabelMax)
+	}
+}
+
+// The stored bound must never be the thing that limits what is shown: the
+// picker knows the terminal's width and this does not. A label cut short by
+// storage leaves the rest of a wide row empty, which is what a 64-rune cap did.
+func TestStorageBoundIsWiderThanAnythingThePickerCanShow(t *testing.T) {
+	if sessionLabelMax <= pickerMaxWidth {
+		t.Errorf("sessionLabelMax (%d) must exceed pickerMaxWidth (%d), or storage truncates the display",
+			sessionLabelMax, pickerMaxWidth)
 	}
 }
 

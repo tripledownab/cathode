@@ -22,11 +22,6 @@ import (
 // neither backend has a place to put one, and a name is the user's note to
 // themselves rather than anything the agent should see.
 
-// titleMaxRunes caps what is stored. The picker truncates to the terminal
-// anyway; this stops an accidental paste of a whole paragraph becoming the
-// row's label, and it counts runes because a title is prose.
-const titleMaxRunes = 72
-
 // commitTitle names the live session, or clears the name when given no
 // argument. Every path says what happened: a silent return reads as "saved".
 func (m *model) commitTitle(arg string) tea.Cmd {
@@ -63,5 +58,5 @@ func (m *model) commitTitle(arg string) tea.Cmd {
 // marks what it dropped. A title cut mid-word with no ellipsis reads as one the
 // user typed that way.
 func trimTitle(s string) string {
-	return trunc(strings.Join(strings.Fields(s), " "), titleMaxRunes)
+	return trunc(strings.Join(strings.Fields(s), " "), sessionLabelMax)
 }

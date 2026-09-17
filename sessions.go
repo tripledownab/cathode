@@ -162,12 +162,23 @@ func (s *sessionStore) rewrite() {
 
 // ---- presentation helpers (display formatting) ----
 
-// truncFirst trims a first-prompt so the picker subtitle stays one line.
+// sessionLabelMax bounds what a session record persists as its label, and is
+// deliberately well past any width the picker can render (pickerMaxWidth).
+//
+// It is a *storage* bound, not a display one: it stops a pasted essay becoming
+// a row's label and bloating the store, and nothing more. Truncating for the
+// screen is the picker's job, because only it knows the terminal's width — when
+// this number did that job instead, a 64-character cut left a third of the row
+// empty on a wide terminal.
+const sessionLabelMax = 200
+
+// truncFirst normalises a first prompt into a one-line session label. It is the
+// row's title when no /title was set, so it is the part the list is read for.
 func truncFirst(s string) string {
 	// trunc, not a byte slice. s[:61] cuts a multi-byte rune in half and emits
 	// invalid UTF-8, and a first prompt is prose — the same bug sysPromptSummary
 	// was already fixed for.
-	return trunc(strings.TrimSpace(strings.ReplaceAll(s, "\n", " ")), 64)
+	return trunc(strings.TrimSpace(strings.ReplaceAll(s, "\n", " ")), sessionLabelMax)
 }
 
 // humanizeAge renders "5m ago" / "2h ago" / "3d ago" style relative times.
