@@ -58,6 +58,13 @@ func slashCommands() []slashCmd {
 			},
 		},
 		{
+			name: "title",
+			desc: "name this session, so the resume picker shows it instead of the first prompt",
+			exec: func(m *model, arg string) (model, tea.Cmd) {
+				return *m, m.commitTitle(arg)
+			},
+		},
+		{
 			name: "backend",
 			desc: "switch the agent CLI without restarting (claude|codex)",
 			exec: func(m *model, arg string) (model, tea.Cmd) {
@@ -222,6 +229,7 @@ func slashCommands() []slashCmd {
 			exec: func(m *model, _ string) (model, tea.Cmd) {
 				cwd, _ := os.Getwd()
 				m.picker = newPicker("sessions", "RESUME SESSION", sessionItems(m.sessions, cwd, m.backend), m.w, m.h)
+				m.picker.twoLine = true
 				return *m, nil
 			},
 		},

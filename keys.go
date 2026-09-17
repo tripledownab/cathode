@@ -132,6 +132,7 @@ func (m model) handleKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 	case "ctrl+r":
 		cwd, _ := os.Getwd()
 		m.picker = newPicker("sessions", "RESUME SESSION", sessionItems(m.sessions, cwd, m.backend), m.w, m.h)
+		m.picker.twoLine = true
 		return m, nil, true
 	case "ctrl+t":
 		m.picker = newPicker("slash", "COMMANDS", m.paletteItems(), m.w, m.h)

@@ -76,6 +76,12 @@ type picker struct {
 	cursor   int // index into filtered
 	w, h     int
 
+	// twoLine puts the subtitle on its own row under the title, instead of
+	// trailing it on the same one. Half as many rows fit, which is the trade:
+	// a one-line row truncates the title away first on a narrow terminal, and
+	// the title is the part you are reading the list for.
+	twoLine bool
+
 	// Checklist mode — see pickermulti.go.
 	multi  bool
 	marked map[int]bool // marked item indices
@@ -210,6 +216,16 @@ func (p *picker) View() string {
 	if maxRows > 16 {
 		maxRows = 16
 	}
+	// maxRows is screen rows; the window is measured in ITEMS. A two-line item
+	// takes two rows, so half as many fit — without this the list renders past
+	// the bottom of the box and the scrollbar no longer matches the text.
+	maxItems := maxRows
+	if p.twoLine {
+		maxItems = maxRows / 2
+		if maxItems < 2 {
+			maxItems = 2
+		}
+	}
 
 	innerW := w - 2     // text area inside the box's 1-col padding
 	listW := innerW - 1 // reserve the last column for the scrollbar gutter
@@ -223,33 +239,64 @@ func (p *picker) View() string {
 	section := cDim.Render("  (no matches)")
 	if len(p.filtered) > 0 {
 		start := 0
-		if p.cursor >= maxRows {
-			start = p.cursor - maxRows + 1
+		if p.cursor >= maxItems {
+			start = p.cursor - maxItems + 1
 		}
-		end := start + maxRows
+		end := start + maxItems
 		if end > len(p.filtered) {
 			end = len(p.filtered)
 		}
-		rows := make([]string, 0, end-start)
+		// ANSI-aware truncate + space-pad to a fixed width so the scrollbar
+		// lands as a straight column regardless of styled content.
+		pad := func(line string, w int) string {
+			line = ansi.Truncate(line, w, "")
+			if n := w - lipgloss.Width(line); n > 0 {
+				line += strings.Repeat(" ", n)
+			}
+			return line
+		}
+		fit := func(line string) string { return pad(line, listW) }
+		rows := make([]string, 0, (end-start)*2)
 		for i := start; i < end; i++ {
 			idx := p.filtered[i]
 			it := p.items[idx]
 			mk := p.mark(idx)
-			line := fmt.Sprintf("  %s%s   %s", mk, it.title, cDim.Render(it.subtitle))
-			if i == p.cursor {
-				line = approveBar.Render(" " + mk + it.title + "   " + it.subtitle + " ")
+			sel := i == p.cursor
+
+			if !p.twoLine {
+				line := fmt.Sprintf("  %s%s   %s", mk, it.title, cDim.Render(it.subtitle))
+				if sel {
+					line = approveBar.Render(" " + mk + it.title + "   " + it.subtitle + " ")
+				}
+				rows = append(rows, fit(line))
+				continue
 			}
-			// ANSI-aware truncate + space-pad to a fixed width so the scrollbar
-			// lands as a straight column regardless of styled content.
-			line = ansi.Truncate(line, listW, "")
-			if pad := listW - lipgloss.Width(line); pad > 0 {
-				line += strings.Repeat(" ", pad)
+
+			// Two rows per item. A selected one is padded to the same width
+			// BEFORE styling, so both lines highlight to the same length — style
+			// first and the lightbar is two ragged blocks, because a title and
+			// its detail line are never the same length.
+			head, sub := "  "+mk+it.title, "    "+it.subtitle
+			if sel {
+				// approveBar carries Padding(0, 1), so the content is padded to
+				// two columns short and the styled row lands at exactly listW.
+				// Pad to the full width and the row wraps, which desyncs the
+				// scrollbar gutter from the text beside it.
+				inner := listW - 2
+				if inner < 1 {
+					inner = 1
+				}
+				rows = append(rows, approveBar.Render(pad(head, inner)))
+				rows = append(rows, approveBar.Render(pad(sub, inner)))
+				continue
 			}
-			rows = append(rows, line)
+			rows = append(rows, fit(head), fit(cDim.Render(sub)))
 		}
 		// Themed BBS scrollbar gutter, mirroring the transcript's — replaces the
 		// old "N more…" text so a long session/command list scrolls in-theme.
-		bar := bbsScrollbar(len(rows), len(p.filtered), len(rows), start, true)
+		// Measured in items, not rows: the thumb tracks position in the list,
+		// and its height is the gutter's, which is however many rows we drew.
+		bar := bbsScrollbar(len(rows), len(p.filtered), end-start, start, true)
 		section = lipgloss.JoinHorizontal(lipgloss.Top, strings.Join(rows, "\n"), bar)
 	}
 
