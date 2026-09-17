@@ -199,6 +199,11 @@ func (p *picker) Update(msg tea.Msg) (*picker, string) {
 	return p, ""
 }
 
+// pickerMaxWidth clamps the dialog on a wide terminal, where a full-width modal
+// would be a very long line to read. It also bounds how much of a row can ever
+// be shown, which is why sessionLabelMax is set well past it (sessions.go).
+const pickerMaxWidth = 100
+
 // View renders the picker as a CP437-bordered dialog. Width is clamped so it
 // looks reasonable even in tiny terminals.
 func (p *picker) View() string {
@@ -206,8 +211,8 @@ func (p *picker) View() string {
 	if w < 40 {
 		w = 40
 	}
-	if w > 100 {
-		w = 100
+	if w > pickerMaxWidth {
+		w = pickerMaxWidth
 	}
 	maxRows := p.h - 8
 	if maxRows < 4 {
@@ -248,8 +253,10 @@ func (p *picker) View() string {
 		}
 		// ANSI-aware truncate + space-pad to a fixed width so the scrollbar
 		// lands as a straight column regardless of styled content.
+		// "…" rather than a bare cut: a row trimmed to fit should say so, or a
+		// truncated title reads as the whole of a shorter one.
 		pad := func(line string, w int) string {
-			line = ansi.Truncate(line, w, "")
+			line = ansi.Truncate(line, w, "…")
 			if n := w - lipgloss.Width(line); n > 0 {
 				line += strings.Repeat(" ", n)
 			}
