@@ -48,10 +48,10 @@ func (m *model) commitTitle(arg string) tea.Cmd {
 // trimTitle normalises what the user typed: one line, no surrounding space,
 // capped. Newlines collapse to spaces because the picker row is one line and a
 // stored newline would silently truncate the rest of the title.
+//
+// The cap goes through trunc rather than slicing here, so it counts runes and
+// marks what it dropped. A title cut mid-word with no ellipsis reads as one the
+// user typed that way.
 func trimTitle(s string) string {
-	s = strings.Join(strings.Fields(s), " ")
-	if r := []rune(s); len(r) > titleMaxRunes {
-		s = strings.TrimSpace(string(r[:titleMaxRunes]))
-	}
-	return s
+	return trunc(strings.Join(strings.Fields(s), " "), titleMaxRunes)
 }
