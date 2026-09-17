@@ -4,7 +4,9 @@
 package main
 
 import (
+	"os"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -31,11 +33,19 @@ func (m *model) commitTitle(arg string) tea.Cmd {
 	title := trimTitle(arg)
 
 	if m.session == "" {
-		// No session id yet — the agent has not reported one, so there is no
-		// store row to attach a title to.
+		// A fresh session has no id until the agent reports one, and claude
+		// does not until the first turn. A resumed session is seeded from the
+		// id it was resumed with (model.go), so this is only the new-session
+		// case.
 		m.add(entError, "no session to name yet — send a turn first")
 		return nil
 	}
+	// Make sure there is a row to title. A session started outside cathode is
+	// listed from claude's own JSONL and may never have been written to our
+	// store, and SetTitle ignores an id it does not know — so without this the
+	// title is dropped while the confirmation below still prints.
+	cwd, _ := os.Getwd()
+	m.sessions.Touch(m.session, m.modelID, cwd, "", m.backend, time.Now())
 	m.sessions.SetTitle(m.session, title)
 	if title == "" {
 		m.add(entInfo, "→ title cleared · the picker shows the first prompt again")
