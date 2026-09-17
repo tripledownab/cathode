@@ -163,12 +163,22 @@ func mergeWithStore(fs []sessionInfo, s *sessionStore, cwd string) []sessionInfo
 	out := make([]sessionInfo, 0, len(fs))
 	for _, e := range fs {
 		if cached, ok := stored[e.ID]; ok {
-			if e.Model == "" && cached.Model != "" {
-				e.Model = cached.Model
+			// Start from the stored record and let the filesystem override only
+			// what it is authoritative for. The reverse — copying named fields
+			// out of the store into the filesystem entry — silently drops every
+			// field nobody remembered to list, which is how session titles were
+			// lost the moment they were added: a claude session always has a
+			// JSONL on disk, so the filesystem entry always won.
+			merged := cached
+			merged.ID, merged.Cwd = e.ID, e.Cwd
+			merged.LastUsed = e.LastUsed // claude's mtime is always the fresher one
+			if e.Model != "" {
+				merged.Model = e.Model
 			}
-			if e.First == "" && cached.First != "" {
-				e.First = cached.First
+			if e.First != "" {
+				merged.First = e.First
 			}
+			e = merged
 		}
 		seen[e.ID] = true
 		out = append(out, e)
