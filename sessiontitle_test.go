@@ -173,3 +173,55 @@ func TestMergeKeepsStoreOnlyFieldsWhenTheFilesystemWins(t *testing.T) {
 		t.Errorf("Model = %q, want the cached one when the file did not name it", got.Model)
 	}
 }
+
+// A resumed session already knows its id, so /title must work before the first
+// turn. claude does not emit system/init until a turn runs, so without seeding
+// this, m.session stays empty on resume and /title refuses with "send a turn
+// first" — which is what live testing hit.
+func TestResumedSessionKnowsItsIdBeforeTheFirstTurn(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	m := newModel(launchConfig{
+		Engine: &fakeEngine{}, Backend: backendClaude,
+		Mode: "ask", Spinner: "bar", ResumeID: "resumed-1",
+	})
+	if m.session != "resumed-1" {
+		t.Errorf("session = %q, want the id it was resumed with", m.session)
+	}
+
+	m.commitTitle("a name")
+	last := m.entries[len(m.entries)-1]
+	if last.kind == entError {
+		t.Errorf("titling a resumed session failed: %q", last.text)
+	}
+	if got := titleOf(t, m.sessions, "resumed-1"); got != "a name" {
+		t.Errorf("stored title = %q, want it saved", got)
+	}
+}
+
+// A session started outside cathode is listed from claude's own JSONL and may
+// never have been written to our store. SetTitle ignores an id it does not
+// know, so the title would be dropped while the confirmation still printed.
+func TestTitlingASessionTheStoreHasNeverSeen(t *testing.T) {
+	m, _ := newTestModel(t, "")
+	m.session = "started-elsewhere"
+
+	m.commitTitle("named from cathode")
+
+	if got := titleOf(t, m.sessions, "started-elsewhere"); got != "named from cathode" {
+		t.Errorf("stored title = %q, want the row created and titled", got)
+	}
+	last := m.entries[len(m.entries)-1]
+	if last.kind == entError {
+		t.Errorf("unexpected error: %q", last.text)
+	}
+}
+
+func titleOf(t *testing.T, s *sessionStore, id string) string {
+	t.Helper()
+	for _, e := range s.All() {
+		if e.ID == id {
+			return e.Title
+		}
+	}
+	return ""
+}

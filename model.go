@@ -270,6 +270,13 @@ func newModel(cfg launchConfig) model {
 	// transcript isn't empty after re-exec. claude itself loads the session
 	// into context — this is purely a visual rehydrate.
 	if cfg.ResumeID != "" {
+		// We already know which session this is, so say so now. claude does not
+		// emit its system/init line until the first turn of a process, so
+		// without this m.session stays empty on a resumed session — and
+		// everything keyed on it (/title, the status row, /sysprompt's restart)
+		// behaves as though there were no session at all until you send a turn.
+		m.session = cfg.ResumeID
+
 		// Skip the boot splash: the user already picked the session, so drop
 		// them straight back into the transcript.
 		m.splash = false
