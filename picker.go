@@ -278,11 +278,14 @@ func (p *picker) View() string {
 			// its detail line are never the same length.
 			head, sub := "  "+mk+it.title, "    "+it.subtitle
 			if sel {
-				// approveBar carries Padding(0, 1), so the content is padded to
-				// two columns short and the styled row lands at exactly listW.
-				// Pad to the full width and the row wraps, which desyncs the
-				// scrollbar gutter from the text beside it.
-				inner := listW - 2
+				// The lightbar style has horizontal padding, so content padded
+				// to the full list width renders wider than it, wraps, and
+				// desyncs the scrollbar gutter from the text beside it. Ask the
+				// style for its own inset rather than restating the number here:
+				// a theme that changes the padding would otherwise break this
+				// silently, and the symptom is a layout glitch nobody traces
+				// back to a style definition.
+				inner := listW - approveBar.GetHorizontalFrameSize()
 				if inner < 1 {
 					inner = 1
 				}

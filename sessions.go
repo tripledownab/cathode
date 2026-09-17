@@ -164,11 +164,10 @@ func (s *sessionStore) rewrite() {
 
 // truncFirst trims a first-prompt so the picker subtitle stays one line.
 func truncFirst(s string) string {
-	s = strings.TrimSpace(strings.ReplaceAll(s, "\n", " "))
-	if len(s) > 64 {
-		return s[:61] + "…"
-	}
-	return s
+	// trunc, not a byte slice. s[:61] cuts a multi-byte rune in half and emits
+	// invalid UTF-8, and a first prompt is prose — the same bug sysPromptSummary
+	// was already fixed for.
+	return trunc(strings.TrimSpace(strings.ReplaceAll(s, "\n", " ")), 64)
 }
 
 // humanizeAge renders "5m ago" / "2h ago" / "3d ago" style relative times.

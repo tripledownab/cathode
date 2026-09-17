@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 )
 
 // A title replaces the first prompt as the row's label, and clearing it brings
@@ -77,9 +78,28 @@ func TestTrimTitleNormalisesWhatWasTyped(t *testing.T) {
 	if got := trimTitle("   "); got != "" {
 		t.Errorf("whitespace-only should clear the title, got %q", got)
 	}
+	// Runes, not bytes: a title is prose, and a byte slice cuts a multi-byte
+	// rune in half and emits invalid UTF-8.
 	long := trimTitle(strings.Repeat("é", 200))
 	if n := len([]rune(long)); n != titleMaxRunes {
 		t.Errorf("capped to %d runes, want %d", n, titleMaxRunes)
+	}
+	if !utf8.ValidString(long) {
+		t.Errorf("capped title is not valid UTF-8: %q", long)
+	}
+	if !strings.HasSuffix(long, "…") {
+		t.Errorf("a capped title should mark what it dropped, got %q", long)
+	}
+}
+
+// The same rule for the first prompt, which used to be sliced by byte offset.
+func TestTruncFirstIsRuneSafe(t *testing.T) {
+	got := truncFirst(strings.Repeat("é", 200))
+	if !utf8.ValidString(got) {
+		t.Errorf("truncated prompt is not valid UTF-8: %q", got)
+	}
+	if n := len([]rune(got)); n != 64 {
+		t.Errorf("capped to %d runes, want 64", n)
 	}
 }
 
@@ -94,5 +114,26 @@ func TestCommitTitleRefusesWithoutASession(t *testing.T) {
 	last := m.entries[len(m.entries)-1]
 	if last.kind != entError || !strings.Contains(last.text, "no session") {
 		t.Errorf("entry = %+v, want an error explaining there is nothing to name", last)
+	}
+}
+
+// With neither a title nor a first prompt there is nothing to label the row
+// with, so it falls back to the id — and the id must then not also head the
+// detail row underneath it.
+func TestSessionRowDoesNotPrintTheIdTwice(t *testing.T) {
+	s := newTestStore(t)
+	const cwd = "/work/repo"
+	s.Touch("sess-abcdef", "sonnet", cwd, "", backendClaude, time.Now())
+
+	it := sessionItems(s, cwd, backendClaude)[0]
+	id := short("sess-abcdef")
+	if it.title != id {
+		t.Errorf("title = %q, want the id as the last-resort label", it.title)
+	}
+	if strings.Contains(it.subtitle, id) {
+		t.Errorf("subtitle %q repeats the id already used as the title", it.subtitle)
+	}
+	if !strings.Contains(it.subtitle, "repo") {
+		t.Errorf("subtitle %q lost the rest of the detail", it.subtitle)
 	}
 }

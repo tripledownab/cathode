@@ -129,14 +129,17 @@ func sessionItems(s *sessionStore, cwd, backend string) []pickerItem {
 		// the second row either way — it identifies the session but nobody scans
 		// a list by it, and on a narrow terminal it was crowding out the part
 		// that is actually readable.
-		title := e.Title
+		title, id := e.Title, short(e.ID)
 		if title == "" {
 			title = e.First
 		}
+		parts := []string{id, filepath.Base(e.Cwd)}
 		if title == "" {
-			title = short(e.ID)
+			// Nothing to label it with: an empty or malformed session file has
+			// no first prompt to read. Fall back to the id, and drop it from the
+			// detail row so it is not printed twice.
+			title, parts = id, parts[1:]
 		}
-		parts := []string{short(e.ID), filepath.Base(e.Cwd)}
 		if e.Model != "" {
 			parts = append(parts, e.Model)
 		}
