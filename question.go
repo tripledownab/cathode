@@ -30,6 +30,17 @@ type askQuestion struct {
 	Header      string      `json:"header"`
 	MultiSelect bool        `json:"multiSelect"`
 	Options     []askOption `json:"options"`
+	// ID is the key the backend files this question's answer under. claude
+	// answers positionally and sends none, so it is empty there; codex keys its
+	// answer map by id (codexquestion.go).
+	ID string `json:"id,omitempty"`
+}
+
+// questionAnswer is one answered question: the labels the user chose, against
+// the id the backend keys its answers by.
+type questionAnswer struct {
+	id     string
+	labels []string
 }
 
 type askInput struct {
@@ -98,6 +109,17 @@ func (q *pendingQuestion) answerMessage() string {
 	}
 	b.WriteString("\n\nUse these answers and continue.")
 	return b.String()
+}
+
+// answerSet is the same answer as data rather than as prose, for a backend that
+// takes it that way. The order is the order the questions were asked, so a
+// backend that sends no ids can still read it positionally.
+func (q *pendingQuestion) answerSet() []questionAnswer {
+	out := make([]questionAnswer, 0, len(q.answers))
+	for i, a := range q.answers {
+		out = append(out, questionAnswer{id: q.questions[i].ID, labels: a})
+	}
+	return out
 }
 
 // summary is the compact transcript note recorded once answered.

@@ -49,6 +49,11 @@ type approvalReq struct {
 type approvalReply struct {
 	allow   bool
 	message string
+	// answers carries a question's answer as data instead of as denial text, for
+	// a backend that takes it that way. claude has only the message channel and
+	// ignores this; codex replies with an answer per question id
+	// (codexquestion.go).
+	answers []questionAnswer
 }
 
 const (
