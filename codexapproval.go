@@ -22,9 +22,10 @@ import (
 // turning a decision back into a JSON-RPC response.
 
 // codexApprovalMethods are the server requests that gate an action, and so can
-// be answered with a decision. Anything not on this list is answered with a
-// JSON-RPC error instead — inventing a reply for a request whose semantics we
-// have not established is worse than declining it plainly.
+// be answered with a decision. A request that is neither one of these nor a
+// question is answered with a JSON-RPC error instead — inventing a reply for a
+// request whose semantics we have not established is worse than declining it
+// plainly.
 var codexApprovalMethods = map[string]bool{
 	"item/commandExecution/requestApproval": true,
 	"item/fileChange/requestApproval":       true,
@@ -62,47 +63,59 @@ func (e *codexEngine) answerServerRequest(f codexFrame) {
 	if f.ID == nil {
 		return
 	}
-	if !codexApprovalMethods[f.Method] {
-		// Not an approval. Answer with the JSON-RPC "method not found" code,
-		// which is a well-defined way to say "this client cannot do that" and
-		// leaves the server to decide what happens next.
+	switch {
+	case f.Method == codexQuestionMethod:
+		// A question, not a permission (codexquestion.go).
+		e.askQuestion(*f.ID, f)
+	case codexApprovalMethods[f.Method]:
+		e.askUser(*f.ID, f)
+	default:
+		// Neither. Answer with the JSON-RPC "method not found" code, which is a
+		// well-defined way to say "this client cannot do that" and leaves the
+		// server to decide what happens next.
 		e.replyError(*f.ID, -32601, "cathode does not implement "+f.Method)
 		e.emitError("unhandled request " + f.Method)
-		return
 	}
-	e.askUser(*f.ID, f)
 }
 
-// askUser puts a gated action in front of the user and answers with what they
-// choose.
+// ask puts one request in front of the user and answers it with result(reply).
+// Every path to the pane goes through here, because the two rules it keeps are
+// the ones that hang a turn when one is missed.
 //
-// All of it runs off the reader goroutine, for two separate reasons. The reader
-// must keep draining while the pane is up, or the item events that draw the
-// very card being approved never arrive. And approvals are admitted one at a
-// time: the UI holds a single pending approval, so a second would overwrite the
-// first and leave codex waiting on a reply that can no longer be given.
-func (e *codexEngine) askUser(id int64, f codexFrame) {
-	var p codexApprovalParams
-	_ = json.Unmarshal(f.Params, &p)
-
+// It runs off the reader goroutine: the reader must keep draining while the
+// pane is up, or the item events that draw the very card being decided never
+// arrive. And it holds the slot for the whole wait, because the UI has room for
+// one request at a time — a second would overwrite the first and leave codex
+// waiting on a reply that can no longer be given.
+func (e *codexEngine) ask(id int64, req approvalReq, result func(approvalReply) any) {
+	reply := make(chan approvalReply, 1)
+	req.reply = reply
 	go func() {
 		e.approvalSlot <- struct{}{}
 		defer func() { <-e.approvalSlot }()
 
-		reply := make(chan approvalReply, 1)
-		e.emitMsg(pendingApprovalMsg{req: approvalReq{
-			toolName:  codexApprovalLabel(f.Method, p),
-			toolUseID: p.ItemID,
-			input:     f.Params,
-			reply:     reply,
-		}})
+		e.emitMsg(pendingApprovalMsg{req: req})
+		e.replyResult(id, result(<-reply))
+	}()
+}
 
+// askUser puts a gated action in front of the user and answers with the
+// decision they made.
+func (e *codexEngine) askUser(id int64, f codexFrame) {
+	var p codexApprovalParams
+	_ = json.Unmarshal(f.Params, &p)
+
+	e.ask(id, approvalReq{
+		toolName:  codexApprovalLabel(f.Method, p),
+		toolUseID: p.ItemID,
+		input:     f.Params,
+	}, func(r approvalReply) any {
 		decision := codexRefusal
-		if (<-reply).allow {
+		if r.allow {
 			decision = codexApproval
 		}
-		e.replyResult(id, map[string]any{"decision": decision})
-	}()
+		return map[string]any{"decision": decision}
+	})
 }
 
 // codexApprovalLabel names the action on the approval bar. The command itself

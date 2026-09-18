@@ -192,10 +192,11 @@ func (m model) handleApprovalKey(msg tea.KeyMsg) (model, tea.Cmd, bool) {
 }
 
 // answerQuestion records the chosen labels for the current AskUserQuestion, then
-// advances to the next question or — once all are answered — replies to claude
-// with the combined answer (via the permission deny-message) and re-arms the
-// approvals waiter. labels holds one label per marked option: several for a
-// multiSelect question, one otherwise.
+// advances to the next question or — once all are answered — replies with the
+// combined answer and re-arms the approvals waiter. The reply carries both
+// forms, because the two backends read different ones: claude the denial text,
+// codex the answers keyed by question id. labels holds one label per marked
+// option: several for a multiSelect question, one otherwise.
 func (m *model) answerQuestion(labels []string) tea.Cmd {
 	q := m.question
 	if q == nil || len(labels) == 0 {
@@ -207,14 +208,15 @@ func (m *model) answerQuestion(labels []string) tea.Cmd {
 		m.picker = q.picker(m.w, m.h)
 		return nil
 	}
-	q.req.reply <- approvalReply{message: q.answerMessage()}
+	q.req.reply <- approvalReply{message: q.answerMessage(), answers: q.answerSet()}
 	m.add(entInfo, "✓ "+q.summary())
 	m.question = nil
 	return waitApproval(m.approvals)
 }
 
-// cancelQuestion dismisses the question (Esc): claude is told it went
-// unanswered, and the waiter is re-armed.
+// cancelQuestion dismisses the question (Esc): the agent is told it went
+// unanswered, and the waiter is re-armed. No answers are attached, which is how
+// codex reads the same thing.
 func (m *model) cancelQuestion() tea.Cmd {
 	q := m.question
 	if q == nil {

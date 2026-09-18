@@ -116,6 +116,9 @@ The codex backend is newer and narrower than the claude one:
 - File changes render as real diff cards, in both the unified and side-by-side
   styles. Other tool calls render as plain cards rather than the typed ones
   claude gets.
+- Either agent can ask you a question, and both use the same picker. A codex
+  question that offers no options, or asks for a secret, is left unanswered —
+  the picker chooses between options and cannot take typed input.
 - `/sysprompt` and `/mcp` are claude-only and are hidden on codex rather than
   offered and inert. Session replay and `/compact` are claude-only too.
 - `@path` inserts a path but does not inject the file. Only claude expands an
