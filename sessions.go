@@ -4,12 +4,7 @@
 package main
 
 import (
-	"bufio"
-	"encoding/json"
-	"fmt"
-	"os"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 )
@@ -42,10 +37,21 @@ func sessionBackend(v string) string {
 	return v
 }
 
-// sessionStore is the on-disk session index, persisted as JSONL at
-// $XDG_STATE_HOME/cathode/sessions.jsonl. The file is rewritten atomically on
-// every Touch so it stays one line per session — simpler than a log-compaction
-// step and the file stays small (one entry per session we've ever seen).
+// sessionStore is the session index, persisted as JSONL at
+// $XDG_STATE_HOME/cathode/sessions.jsonl, one line per session ever seen.
+//
+// The *file* is the state and entries is only a cache of it. That distinction is
+// the whole design, and getting it wrong lost user data: several cathode
+// instances run at once, and a write that rebuilt the file from a map loaded at
+// process start erased every row another instance had written since. A row is
+// only ever written by the instance whose session it is, so the loser of that
+// race lost the row outright — titles vanished, and store-only sessions
+// disappeared from the picker. It was invisible for as long as the store was
+// tested one process at a time.
+//
+// So every write re-reads the file under an exclusive lock, and every read
+// re-reads it too. The file holds one line per session, and a turn is nowhere
+// near hot enough for that to cost anything.
 type sessionStore struct {
 	mu      sync.Mutex
 	entries map[string]sessionInfo
@@ -58,7 +64,9 @@ func openSessionStore() *sessionStore {
 		return &sessionStore{entries: map[string]sessionInfo{}}
 	}
 	s := &sessionStore{entries: map[string]sessionInfo{}, path: path}
-	s.load()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.refresh()
 	return s
 }
 
@@ -66,147 +74,62 @@ func sessionsPath() (string, error) {
 	return stateFilePath("sessions.jsonl")
 }
 
-func (s *sessionStore) load() {
-	f, err := os.Open(s.path)
-	if err != nil {
-		return
-	}
-	defer f.Close()
-	sc := bufio.NewScanner(f)
-	sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-	for sc.Scan() {
-		var e sessionInfo
-		if err := json.Unmarshal(sc.Bytes(), &e); err == nil && e.ID != "" {
-			s.entries[e.ID] = e
-		}
-	}
-}
-
-// Touch upserts a session. Empty model/cwd/first don't overwrite existing
-// values (so a follow-up Touch carrying only LastUsed preserves prior
-// metadata). LastUsed is always bumped.
 // SetTitle names a session. An empty title clears it, so the picker falls back
 // to the first prompt — there is no separate "unset" verb to remember.
 func (s *sessionStore) SetTitle(id, title string) {
 	if id == "" {
 		return
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	cur, ok := s.entries[id]
-	if !ok {
-		// Titling a session the store has never seen would create a row with no
-		// cwd, model or timestamp, which then sorts and renders as a ghost.
-		return
-	}
-	cur.Title = title
-	s.entries[id] = cur
-	s.rewrite() // called with the lock held, the same as Touch
+	s.mutate(func(m map[string]sessionInfo) {
+		cur, ok := m[id]
+		if !ok {
+			// Titling a session the store has never seen would create a row with
+			// no cwd, model or timestamp, which then sorts and renders as a ghost.
+			return
+		}
+		cur.Title = title
+		m[id] = cur
+	})
 }
 
+// Touch upserts a session. Empty model/cwd/first don't overwrite existing
+// values (so a follow-up Touch carrying only LastUsed preserves prior
+// metadata). LastUsed is always bumped.
 func (s *sessionStore) Touch(id, model, cwd, first, backend string, now time.Time) {
 	if id == "" {
 		return
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	cur := s.entries[id]
-	cur.ID = id
-	if backend != "" {
-		cur.Backend = backend
-	}
-	if model != "" {
-		cur.Model = model
-	}
-	if cwd != "" {
-		cur.Cwd = cwd
-	}
-	if first != "" && cur.First == "" {
-		cur.First = first
-	}
-	cur.LastUsed = now
-	s.entries[id] = cur
-	s.rewrite()
+	s.mutate(func(m map[string]sessionInfo) {
+		cur := m[id]
+		cur.ID = id
+		if backend != "" {
+			cur.Backend = backend
+		}
+		if model != "" {
+			cur.Model = model
+		}
+		if cwd != "" {
+			cur.Cwd = cwd
+		}
+		if first != "" && cur.First == "" {
+			cur.First = first
+		}
+		cur.LastUsed = now
+		m[id] = cur
+	})
 }
 
-// All returns sessions sorted most-recent first.
+// All returns sessions sorted most-recent first. It re-reads the file, because
+// the picker has to list what the other instances recorded too — a session
+// started in another window is exactly the one you came to the picker for.
 func (s *sessionStore) All() []sessionInfo {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.refresh()
 	out := make([]sessionInfo, 0, len(s.entries))
 	for _, e := range s.entries {
 		out = append(out, e)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].LastUsed.After(out[j].LastUsed) })
 	return out
-}
-
-// rewrite is held-lock; callers must hold s.mu. Atomic via tmp + rename so a
-// crash mid-write can't leave the file half-truncated.
-func (s *sessionStore) rewrite() {
-	if s.path == "" {
-		return
-	}
-	tmp := s.path + ".tmp"
-	f, err := os.Create(tmp)
-	if err != nil {
-		return
-	}
-	for _, e := range s.entries {
-		b, _ := json.Marshal(e)
-		_, _ = f.Write(append(b, '\n'))
-	}
-	_ = f.Close()
-	_ = os.Rename(tmp, s.path)
-}
-
-// ---- presentation helpers (display formatting) ----
-
-// sessionLabelMax bounds what a session record persists as its label, and is
-// deliberately well past any width the picker can render (pickerMaxWidth).
-//
-// It is a *storage* bound, not a display one: it stops a pasted essay becoming
-// a row's label and bloating the store, and nothing more. Truncating for the
-// screen is the picker's job, because only it knows the terminal's width — when
-// this number did that job instead, a 64-character cut left a third of the row
-// empty on a wide terminal.
-const sessionLabelMax = 200
-
-// truncFirst normalises a first prompt into a one-line session label. It is the
-// row's title when no /title was set, so it is the part the list is read for.
-func truncFirst(s string) string {
-	// trunc, not a byte slice. s[:61] cuts a multi-byte rune in half and emits
-	// invalid UTF-8, and a first prompt is prose — the same bug sysPromptSummary
-	// was already fixed for.
-	return trunc(strings.TrimSpace(strings.ReplaceAll(s, "\n", " ")), sessionLabelMax)
-}
-
-// humanizeAge renders "5m ago" / "2h ago" / "3d ago" style relative times.
-func humanizeAge(t time.Time) string {
-	if t.IsZero() {
-		return "—"
-	}
-	d := time.Since(t)
-	switch {
-	case d < time.Minute:
-		return "just now"
-	case d < time.Hour:
-		return fmt.Sprintf("%dm ago", int(d.Minutes()))
-	case d < 24*time.Hour:
-		return fmt.Sprintf("%dh ago", int(d.Hours()))
-	default:
-		return fmt.Sprintf("%dd ago", int(d.Hours()/24))
-	}
-}
-
-// short truncates an identifier to 8 chars (with "—" for empty), used for
-// session IDs in picker rows, status bars, and sidebar headers.
-func short(s string) string {
-	if s == "" {
-		return "—"
-	}
-	if len(s) > 8 {
-		return s[:8]
-	}
-	return s
 }

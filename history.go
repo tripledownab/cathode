@@ -4,9 +4,6 @@
 package main
 
 import (
-	"bufio"
-	"encoding/json"
-	"os"
 	"strings"
 	"sync"
 )
@@ -24,9 +21,13 @@ type promptEntry struct {
 
 // history is the Ctrl-Up/Down recall buffer. Persisted as JSONL at
 // $XDG_STATE_HOME/cathode/prompt-history.jsonl (or ~/.local/state/cathode/
-// when XDG_STATE_HOME is unset). Reads happen once at startup; appends touch
-// only the tail in the common case, so it's safe to share across runs of the
-// same session.
+// when XDG_STATE_HOME is unset).
+//
+// entries is a cache of that file, not the store: every running cathode
+// instance shares it, so the write rules in historyfile.go are what keep one
+// window from erasing another's prompts. This comment used to claim appends
+// "touch only the tail in the common case", which is what hid the fact that past
+// the cap they did not — see load.
 type history struct {
 	mu      sync.Mutex
 	entries []promptEntry
@@ -43,7 +44,9 @@ func openHistory() *history {
 		return &history{}
 	}
 	h := &history{path: path}
-	h.load()
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.load() // held-lock, as load documents
 	return h
 }
 
@@ -53,54 +56,13 @@ func historyPath() (string, error) {
 	return stateFilePath("prompt-history.jsonl")
 }
 
-// load reads the JSONL and silently drops malformed lines (a previous crash
-// mid-write shouldn't break recall). If the file is over the cap, we rewrite it
-// trimmed — opencode does the same self-heal.
-func (h *history) load() {
-	f, err := os.Open(h.path)
-	if err != nil {
-		return
-	}
-	defer f.Close()
-	sc := bufio.NewScanner(f)
-	sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-	var lines []promptEntry
-	for sc.Scan() {
-		var e promptEntry
-		if err := json.Unmarshal(sc.Bytes(), &e); err == nil && e.Input != "" {
-			lines = append(lines, e)
-		}
-	}
-	if len(lines) > maxHistoryEntries {
-		lines = lines[len(lines)-maxHistoryEntries:]
-		h.entries = lines
-		h.rewrite()
-		return
-	}
-	h.entries = lines
-}
-
-// rewrite atomically replaces the file with the in-memory entries. Only used
-// for the cap-trim self-heal, never on the hot path.
-func (h *history) rewrite() {
-	if h.path == "" {
-		return
-	}
-	tmp := h.path + ".tmp"
-	f, err := os.Create(tmp)
-	if err != nil {
-		return
-	}
-	for _, e := range h.entries {
-		b, _ := json.Marshal(e)
-		_, _ = f.Write(append(b, '\n'))
-	}
-	_ = f.Close()
-	_ = os.Rename(tmp, h.path)
-}
-
 // Append records a new prompt. Adjacent duplicates are dropped (re-sending the
 // same prompt three times leaves one entry). Resets the walk cursor to live.
+//
+// "Adjacent" is now adjacent in the shared file, not in this window's own
+// entries, because load reads what every window appended. So sending a prompt
+// another window just sent records nothing new — the history already ends with
+// that line, which is what the rule was always for.
 func (h *history) Append(input string) {
 	if strings.TrimSpace(input) == "" {
 		return
@@ -113,21 +75,11 @@ func (h *history) Append(input string) {
 	}
 	h.entries = append(h.entries, promptEntry{Input: input})
 	h.cursor = 0
-	if len(h.entries) > maxHistoryEntries {
-		h.entries = h.entries[len(h.entries)-maxHistoryEntries:]
-		h.rewrite()
-		return
-	}
 	if h.path == "" {
 		return
 	}
-	f, err := os.OpenFile(h.path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
-	if err != nil {
-		return
-	}
-	defer f.Close()
-	b, _ := json.Marshal(promptEntry{Input: input})
-	_, _ = f.Write(append(b, '\n'))
+	h.appendLine(input)
+	h.load() // re-read: the file also holds what the other windows appended
 }
 
 // Rewind puts the walk cursor back at live. Call it when the prompt is cleared
