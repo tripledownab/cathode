@@ -10,14 +10,18 @@ import (
 	"path/filepath"
 )
 
-// ---- reading and replacing a JSONL state file ----
+// ---- reading and replacing a state file ----
 //
-// Both persisted stores are JSONL under $XDG_STATE_HOME/cathode, and both are
-// shared by every running cathode instance. The two operations that has to get
-// right live here rather than once per store, because a copy differing by one
-// detail is how a shared file loses data quietly: the session store and the
-// prompt history each grew their own, and only one of them ended up with a
+// Every file under $XDG_STATE_HOME/cathode is shared by every running cathode
+// instance, so how one is read and how one is replaced both have to be right.
+// They live here rather than once per store, because a copy differing by a
+// single detail is how a shared file loses data quietly: the session store and
+// the prompt history each grew their own, and only one of them ended up with a
 // unique temp name.
+//
+// readJSONL and writeJSONL serve the two JSONL stores. replaceFile is the
+// atomic write under both, and settings.json (a single JSON object) uses it
+// directly.
 
 // maxStateLine bounds one record. A pasted prompt is the longest thing either
 // store holds, and a longer line is dropped rather than growing the scanner
@@ -45,33 +49,51 @@ func readJSONL[T any](path string) []T {
 	return out
 }
 
-// writeJSONL replaces path with one JSON line per record.
-//
-// Atomic via a temp file and a rename, so a crash cannot leave the file
-// half-truncated and a concurrent reader sees either the old file or the new
-// one. The temp name is unique: two instances sharing one "<name>.tmp" write
-// into the same file and rename a half-finished one into place, which is the one
-// way a whole store goes at once.
+// writeJSONL replaces path with one JSON line per record. A record that will not
+// marshal is left out rather than failing the write, so one bad row costs its own
+// line and not the file.
 //
 // Callers must hold the file lock (lockState) and must have re-read the file
 // inside it. Replacing a file that several instances write means starting from
 // what is on disk, not from a cache loaded at process start — see sessionStore
 // for what that cost.
 func writeJSONL[T any](path string, records []T) {
-	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".tmp-*")
-	if err != nil {
-		return
-	}
+	var body []byte
 	for _, r := range records {
 		b, err := json.Marshal(r)
 		if err != nil {
 			continue
 		}
-		if _, err := tmp.Write(append(b, '\n')); err != nil {
-			_ = tmp.Close()
-			_ = os.Remove(tmp.Name())
-			return
-		}
+		body = append(append(body, b...), '\n')
+	}
+	replaceFile(path, body)
+}
+
+// replaceFile writes body to path atomically: a temp file and a rename, so a
+// crash cannot leave the file half-truncated and a concurrent reader sees either
+// the old file or the new one.
+//
+// The temp name is unique. Two instances sharing one "<name>.tmp" write into the
+// same file and rename a half-finished one into place, which is the one way a
+// whole state file goes at once. This is the only way any state file is
+// replaced, so that cannot be got right in one store and wrong in another.
+func replaceFile(path string, body []byte) {
+	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".tmp-*")
+	if err != nil {
+		return
+	}
+	if _, err := tmp.Write(body); err != nil {
+		_ = tmp.Close()
+		_ = os.Remove(tmp.Name())
+		return
+	}
+	// Sync before the rename, or the rename can reach the disk while the bytes
+	// have not — which leaves a file that is present and empty. That is the one
+	// crash this is supposed to rule out, so the claim above needs this line.
+	if err := tmp.Sync(); err != nil {
+		_ = tmp.Close()
+		_ = os.Remove(tmp.Name())
+		return
 	}
 	if err := tmp.Close(); err != nil {
 		_ = os.Remove(tmp.Name())

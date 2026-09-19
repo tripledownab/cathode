@@ -38,14 +38,15 @@ func TestHistoryAppendCapsAtMax(t *testing.T) {
 }
 
 // The prompt-history file is shared by every cathode instance, and the cap is
-// small enough that an established history trims on nearly every turn. So the
-// trim must re-read the file rather than rebuild it from one instance's memory,
-// or each window erases the other's prompts as fast as they are typed.
+// small enough that an established history reaches the cap self-heal on nearly
+// every turn. So load must re-read the file rather than rebuild it from one
+// instance's memory, or each window erases the other's prompts as fast as they
+// are typed.
 func TestHistoryKeepsWhatAnotherInstanceAppended(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "prompt-history.jsonl")
 	a, b := &history{path: path}, &history{path: path}
 
-	// Fill past the cap so every further append takes the trim path.
+	// Fill past the cap, so every further append reaches the self-heal.
 	for i := 0; i < maxHistoryEntries; i++ {
 		a.Append(fmt.Sprintf("a-%02d", i))
 	}

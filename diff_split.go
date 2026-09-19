@@ -48,8 +48,7 @@ func diffItems() []pickerItem {
 // commitDiff applies the chosen diff style, re-renders the transcript's existing
 // diff cards in it, and persists the choice.
 func (m *model) commitDiff(id string) {
-	m.settings.Diff = id
-	saveSettings(m.settings)
+	m.commitSetting(func(s *settings) { s.Diff = id })
 	m.rerender()
 	m.add(entInfo, "→ diff: "+diffLabel(id))
 }

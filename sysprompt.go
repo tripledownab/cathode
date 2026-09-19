@@ -191,8 +191,7 @@ func (m *model) commitSysPrompt(id string) tea.Cmd {
 		m.add(entError, "no system prompt to apply — write one to "+sysPromptPath()+" first")
 		return nil
 	}
-	m.settings.SysPrompt = on
-	saveSettings(m.settings)
+	m.commitSetting(func(s *settings) { s.SysPrompt = on })
 
 	what := "extra system prompt: " + sysPromptLabel(on)
 	if edited {

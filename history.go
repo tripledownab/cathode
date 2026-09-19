@@ -26,8 +26,8 @@ type promptEntry struct {
 // entries is a cache of that file, not the store: every running cathode
 // instance shares it, so the write rules in historyfile.go are what keep one
 // window from erasing another's prompts. This comment used to claim appends
-// "touch only the tail in the common case", which is what hid the fact that
-// past the cap they did not — see trim.
+// "touch only the tail in the common case", which is what hid the fact that past
+// the cap they did not — see load.
 type history struct {
 	mu      sync.Mutex
 	entries []promptEntry
@@ -46,7 +46,7 @@ func openHistory() *history {
 	h := &history{path: path}
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	h.load() // held-lock, like every other caller
+	h.load() // held-lock, as load documents
 	return h
 }
 
