@@ -12,7 +12,6 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/x/ansi"
 )
 
 // fuzzyScore returns (score, matched). A higher score is better. Subsequence
@@ -81,6 +80,10 @@ type picker struct {
 	// a one-line row truncates the title away first on a narrow terminal, and
 	// the title is the part you are reading the list for.
 	twoLine bool
+
+	// wrap shows the whole subtitle, wrapped onto rows under the title, and
+	// lets the box grow to the terminal height — see pickerwrap.go.
+	wrap bool
 
 	// Checklist mode — see pickermulti.go.
 	multi  bool
@@ -218,7 +221,7 @@ func (p *picker) View() string {
 	if maxRows < 4 {
 		maxRows = 4
 	}
-	if maxRows > 16 {
+	if maxRows > 16 && !p.wrap {
 		maxRows = 16
 	}
 	// maxRows is screen rows; the window is measured in ITEMS. A two-line item
@@ -242,7 +245,11 @@ func (p *picker) View() string {
 	}
 
 	section := cDim.Render("  (no matches)")
-	if len(p.filtered) > 0 {
+	if len(p.filtered) > 0 && p.wrap {
+		rows, start, end := p.wrapRows(listW, maxRows)
+		bar := bbsScrollbar(len(rows), len(p.filtered), end-start, start, true)
+		section = lipgloss.JoinHorizontal(lipgloss.Top, strings.Join(rows, "\n"), bar)
+	} else if len(p.filtered) > 0 {
 		start := 0
 		if p.cursor >= maxItems {
 			start = p.cursor - maxItems + 1
@@ -251,18 +258,7 @@ func (p *picker) View() string {
 		if end > len(p.filtered) {
 			end = len(p.filtered)
 		}
-		// ANSI-aware truncate + space-pad to a fixed width so the scrollbar
-		// lands as a straight column regardless of styled content.
-		// "…" rather than a bare cut: a row trimmed to fit should say so, or a
-		// truncated title reads as the whole of a shorter one.
-		pad := func(line string, w int) string {
-			line = ansi.Truncate(line, w, "…")
-			if n := w - lipgloss.Width(line); n > 0 {
-				line += strings.Repeat(" ", n)
-			}
-			return line
-		}
-		fit := func(line string) string { return pad(line, listW) }
+		fit := func(line string) string { return padRow(line, listW) }
 		rows := make([]string, 0, (end-start)*2)
 		for i := start; i < end; i++ {
 			idx := p.filtered[i]
@@ -296,8 +292,8 @@ func (p *picker) View() string {
 				if inner < 1 {
 					inner = 1
 				}
-				rows = append(rows, approveBar.Render(pad(head, inner)))
-				rows = append(rows, approveBar.Render(pad(sub, inner)))
+				rows = append(rows, approveBar.Render(padRow(head, inner)))
+				rows = append(rows, approveBar.Render(padRow(sub, inner)))
 				continue
 			}
 			rows = append(rows, fit(head), fit(cDim.Render(sub)))
