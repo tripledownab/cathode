@@ -92,6 +92,8 @@ func (q *pendingQuestion) picker(w, h int) *picker {
 		title = fmt.Sprintf("(%d/%d) %s", q.idx+1, n, cur.Question)
 	}
 	p := newPicker("question", title, items, w, h)
+	// A description explains the choice, so it is shown whole, not cut to a row.
+	p.wrap = true
 	// Claude asked for several answers, so mark rows instead of picking one.
 	if cur.MultiSelect {
 		p.setMulti()
