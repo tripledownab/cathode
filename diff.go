@@ -167,7 +167,7 @@ func atoiBefore(s string) int {
 	return v
 }
 
-func tabs(s string) string { return strings.ReplaceAll(s, "\t", "  ") }
+func tabs(s string) string { return expandTabs(s, 2) }
 
 func trunc(s string, w int) string {
 	if w < 1 {

@@ -28,12 +28,12 @@ func (m *model) rebuild() {
 		m.renderedCount = 0
 		m.entryLine, m.lineCount = m.entryLine[:0], 0
 		for _, e := range m.entries {
-			m.appendEntry(linkify(m.renderEntry(e)))
+			m.appendEntry(m.displayEntry(e))
 		}
 		m.cacheWidth = m.vp.Width
 	} else {
 		for i := m.renderedCount; i < len(m.entries); i++ {
-			m.appendEntry(linkify(m.renderEntry(m.entries[i])))
+			m.appendEntry(m.displayEntry(m.entries[i]))
 		}
 	}
 	// Builder.String() hands the viewport its backing bytes without copying;
@@ -55,7 +55,7 @@ func (m *model) rebuild() {
 // while only touching the new tail.
 // It also records where the entry starts, which is what makes an entry index
 // addressable as a scroll offset (jump.go). The count is exact because every
-// renderer wraps to m.vp.Width, so one content line is one viewport line.
+// render goes through displayEntry, so one content line is one viewport line.
 func (m *model) appendEntry(s string) {
 	if m.renderedCount > 0 {
 		m.content.WriteString("\n")
@@ -85,7 +85,9 @@ func (m *model) renderEntry(e entry) string {
 	case entAgent:
 		body := e.text
 		if m.md != nil {
-			if out, err := m.md.Render(e.text); err == nil {
+			// Glamour measures a tab as no cells and pads the line by that
+			// measure, so it gets the tabs already expanded (fitwidth.go).
+			if out, err := m.md.Render(expandTabs(e.text, tabWidth)); err == nil {
 				body = strings.TrimRight(out, "\n")
 			}
 		}
@@ -150,6 +152,12 @@ func (m *model) resizeViewport() {
 		m.ready = true
 	} else {
 		m.vp.Width, m.vp.Height = vpW, vpH
+	}
+	// A shorter viewport keeps its offset, so the rows it lost are the newest
+	// ones. The prompt growing or the compact bar appearing would hide them
+	// until the next rebuild, which may never come once the turn has ended.
+	if m.follow {
+		m.vp.GotoBottom()
 	}
 }
 
