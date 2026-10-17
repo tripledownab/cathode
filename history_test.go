@@ -4,6 +4,7 @@
 package main
 
 import (
+	"fmt"
 	"path/filepath"
 	"testing"
 )
@@ -33,6 +34,42 @@ func TestHistoryAppendCapsAtMax(t *testing.T) {
 	}
 	if got := len(h.entries); got != maxHistoryEntries {
 		t.Fatalf("entries = %d, want %d", got, maxHistoryEntries)
+	}
+}
+
+// The prompt-history file is shared by every cathode instance, and the cap is
+// small enough that an established history reaches the cap self-heal on nearly
+// every turn. So load must re-read the file rather than rebuild it from one
+// instance's memory, or each window erases the other's prompts as fast as they
+// are typed.
+func TestHistoryKeepsWhatAnotherInstanceAppended(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "prompt-history.jsonl")
+	a, b := &history{path: path}, &history{path: path}
+
+	// Fill past the cap, so every further append reaches the self-heal.
+	for i := 0; i < maxHistoryEntries; i++ {
+		a.Append(fmt.Sprintf("a-%02d", i))
+	}
+	b.load() // B starts up and sees A's history
+	a.Append("typed in window A")
+	b.Append("typed in window B")
+
+	fresh := &history{path: path}
+	fresh.load()
+	var seenA, seenB bool
+	for _, e := range fresh.entries {
+		switch e.Input {
+		case "typed in window A":
+			seenA = true
+		case "typed in window B":
+			seenB = true
+		}
+	}
+	if !seenA || !seenB {
+		t.Errorf("window A kept = %v, window B kept = %v; want both", seenA, seenB)
+	}
+	if len(fresh.entries) > maxHistoryEntries {
+		t.Errorf("entries = %d, want the cap held at %d", len(fresh.entries), maxHistoryEntries)
 	}
 }
 

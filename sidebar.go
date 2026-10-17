@@ -49,8 +49,7 @@ func sidebarPosItems() []pickerItem {
 // commitSidebarPos persists the side the info rail sits on. The body memo keys
 // on it (see bodyKey), so the next frame repositions the rail.
 func (m *model) commitSidebarPos(id string) {
-	m.settings.Sidebar = id
-	saveSettings(m.settings)
+	m.commitSetting(func(s *settings) { s.Sidebar = id })
 	m.add(entInfo, "→ sidebar: "+sidebarLabel(id))
 }
 

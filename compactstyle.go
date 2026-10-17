@@ -64,8 +64,7 @@ func barItems() []pickerItem {
 // commitBar persists the compact-bar animation. Chrome only — nothing in the
 // transcript re-renders, so the next frame just draws the new style.
 func (m *model) commitBar(id string) {
-	m.settings.Bar = id
-	saveSettings(m.settings)
+	m.commitSetting(func(s *settings) { s.Bar = id })
 	m.add(entInfo, "→ compact bar: "+barLabel(id))
 }
 
